@@ -43,3 +43,13 @@ test('rolls back a failing migration and keeps the previous version', () => {
   assert.equal(version(db), 1);
   assert.equal(db.prepare('SELECT count(*) AS c FROM t').get()!.c, 0);
 });
+
+test('the real migrations apply to a fresh database', () => {
+  const db = new DatabaseSync(':memory:');
+  migrate(db);
+  assert.ok(version(db) >= 1);
+  const columns = db.prepare('SELECT name FROM pragma_table_info(?)').all('transactions').map((r) => r.name);
+  assert.deepEqual(columns, [
+    'id', 'user_id', 'sec_type', 'side', 'ticker', 'shares', 'price', 'trade_date', 'created_at', 'split_from', 'split_to',
+  ]);
+});
