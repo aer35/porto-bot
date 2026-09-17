@@ -12,6 +12,10 @@ const txLine = (tx: Tx, shares?: [number, number]) =>
 // Every user-facing string lives here.
 export const messages = {
   txLine,
+  confirm: 'Confirm',
+  cancel: 'Cancel',
+  cancelled: 'Cancelled. Nothing was changed.',
+  notYourRow: (id: number) => `You have no transaction #${id}. Find your IDs with /position.`,
   previous: 'Previous',
   next: 'Next',
   page: (page: number, pageCount: number) => `Page ${page + 1} of ${pageCount}`,
@@ -23,6 +27,7 @@ export const messages = {
     price: 'Price per share',
     date: 'Trade date as YYYY-MM-DD. Defaults to today',
     user: 'Whose transactions to show. Defaults to you',
+    id: 'Transaction ID, shown as #123 in /position',
   },
 
   invalidTicker: 'Tickers are 1–6 letters or dots, like `AAPL` or `BRK.B`.',
@@ -50,5 +55,11 @@ export const messages = {
       `## ${ticker} — <@${userId}>\n` +
       (position ? `Holding ${position.shares} shares @ ${money(position.avgCost)} avg\n\n` : 'No shares held\n\n') +
       lines.join('\n'),
+  },
+
+  delete: {
+    description: 'Delete one of your transactions',
+    prompt: (tx: Tx) => `Delete this transaction?\n${txLine(tx)}`,
+    done: (tx: Tx) => `Deleted ${txLine(tx)}`,
   },
 };
