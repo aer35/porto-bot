@@ -19,6 +19,7 @@ export const messages = {
     shares: 'Number of whole shares',
     price: 'Price per share',
     date: 'Trade date as YYYY-MM-DD. Defaults to today',
+    user: 'Whose portfolio to show. Defaults to you',
   },
 
   invalidTicker: 'Tickers are 1–6 letters or dots, like `AAPL` or `BRK.B`.',
@@ -29,4 +30,13 @@ export const messages = {
   buy: { description: 'Record shares you bought' },
   sell: { description: 'Record shares you sold' },
   recorded: (userId: string, tx: Tx) => `<@${userId}> recorded ${txLine(tx)}`,
+
+  portfolio: {
+    description: 'Show holdings and recent transactions',
+    columns: ['Ticker', 'Shares', 'Avg cost'],
+    noHoldings: 'No holdings.',
+    body: (userId: string, holdings: string, recent: string[]) =>
+      `## Portfolio of <@${userId}>\n**Holdings**\n${holdings}\n**Recent transactions**\n` +
+      (recent.length ? recent.join('\n') : 'None yet.'),
+  },
 };
