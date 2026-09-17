@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { replay, type Tx } from '../components/ledger.js';
+import { applyChange, replay, type Tx } from '../components/ledger.js';
 
 let nextId = 1;
 const DAY = 86_400;
@@ -125,4 +125,29 @@ test('history records shares held of that ticker after each row, in replay order
     { tx: sp, shares: 8 },
     { tx: s, shares: 5 },
   ]);
+});
+
+test('applyChange insert appends a row that sorts after existing rows on the same date', () => {
+  const b = buy(10, 100, 1, { created_at: 50 });
+  const { id, created_at, ...fields } = sell(10, 100, 1);
+  const next = applyChange([b], { insert: fields });
+  assert.equal(next.length, 2);
+  assert.equal(replay(next).ok, true);
+  assert.ok(next[1].id > b.id && next[1].created_at >= b.created_at);
+});
+
+test('applyChange update replaces the row with the same id', () => {
+  const b = buy(10, 100);
+  const s = sell(5, 100);
+  const next = applyChange([b, s], { update: { ...s, shares: 11 } });
+  assert.deepEqual(next, [b, { ...s, shares: 11 }]);
+  assert.equal(replay(next).ok, false);
+});
+
+test('applyChange delete removes the row with that id', () => {
+  const b = buy(10, 100);
+  const s = sell(5, 100);
+  const next = applyChange([b, s], { delete: b });
+  assert.deepEqual(next, [s]);
+  assert.equal(replay(next).ok, false);
 });
