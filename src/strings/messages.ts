@@ -83,4 +83,10 @@ export const messages = {
     title: 'Delete all transactions for this member?',
     done: (userId: string, count: number) => `Deleted ${count} transactions for <@${userId}>.`,
   },
+
+  clear: {
+    description: 'Delete all of your transactions for one ticker',
+    title: (ticker: string) => `Delete all your ${ticker} transactions?`,
+    done: (ticker: string, count: number) => `Deleted ${count} of your **${ticker}** transactions.`,
+  },
 };
