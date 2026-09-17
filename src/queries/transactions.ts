@@ -43,3 +43,7 @@ export const updateRow = (tx: Tx) =>
     }) as Tx;
 
 export const deleteRow = (id: number) => db.prepare('DELETE FROM transactions WHERE id = ?').run(id);
+
+// Removes every row for a user, splits included. Returns how many rows were deleted.
+export const deleteUserRows = (userId: string) =>
+  Number(db.prepare('DELETE FROM transactions WHERE user_id = ?').run(userId).changes);

@@ -14,6 +14,9 @@ export const messages = {
   txLine,
   confirm: 'Confirm',
   cancel: 'Cancel',
+  typeToConfirm: 'Type the text shown below to confirm',
+  confirmMismatch: 'That did not match. Nothing was deleted.',
+  notAllowed: 'You need the Manage Server permission to do that.',
   cancelled: 'Cancelled. Nothing was changed.',
   notYourRow: (id: number) => `You have no transaction #${id}. Find your IDs with /position.`,
   previous: 'Previous',
@@ -72,5 +75,12 @@ export const messages = {
     split: 'Split rows cannot be amended. Use /delete to undo a split.',
     invalidSide: 'Side must be `BUY` or `SELL`.',
     done: (userId: string, tx: Tx) => `<@${userId}> amended ${txLine(tx)}`,
+  },
+
+  reset: {
+    description: "Delete every transaction for one member (Manage Server only)",
+    userOption: 'Member whose history to delete',
+    title: 'Delete all transactions for this member?',
+    done: (userId: string, count: number) => `Deleted ${count} transactions for <@${userId}>.`,
   },
 };
