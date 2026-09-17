@@ -31,6 +31,8 @@ export const messages = {
   },
 
   invalidTicker: 'Tickers are 1–6 letters or dots, like `AAPL` or `BRK.B`.',
+  invalidShares: 'Shares must be a whole number above 0.',
+  invalidPrice: 'Price must be a number, 0 or more.',
   invalidDate: 'Dates must be `YYYY-MM-DD` and not in the future.',
   oversold: (tx: Tx) =>
     `That would leave you with negative **${tx.ticker}** shares as of ${date(tx.trade_date)}. Nothing was changed.`,
@@ -61,5 +63,14 @@ export const messages = {
     description: 'Delete one of your transactions',
     prompt: (tx: Tx) => `Delete this transaction?\n${txLine(tx)}`,
     done: (tx: Tx) => `Deleted ${txLine(tx)}`,
+  },
+
+  amend: {
+    description: 'Edit one of your transactions',
+    title: (id: number) => `Amend transaction #${id}`,
+    fields: { ticker: 'Ticker', side: 'Side (BUY or SELL)', shares: 'Shares', price: 'Price per share', date: 'Date (YYYY-MM-DD)' },
+    split: 'Split rows cannot be amended. Use /delete to undo a split.',
+    invalidSide: 'Side must be `BUY` or `SELL`.',
+    done: (userId: string, tx: Tx) => `<@${userId}> amended ${txLine(tx)}`,
   },
 };
