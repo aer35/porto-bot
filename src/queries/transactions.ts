@@ -22,8 +22,8 @@ export const insertRow = (tx: NewTx) =>
 
 // Overwrites the user-editable fields of a row and returns it as stored. user_id, sec_type and
 // created_at are never changed, so an amended row keeps its place among same-day rows.
-export const updateRow = (tx: Tx) =>
-  db
+export function updateRow({ user_id, sec_type, created_at, ...fields }: Tx) {
+  return db
     .prepare(
       `UPDATE transactions
        SET side = :side, ticker = :ticker, shares = :shares, price = :price, trade_date = :trade_date,
@@ -31,16 +31,8 @@ export const updateRow = (tx: Tx) =>
        WHERE id = :id
        RETURNING *`,
     )
-    .get({
-      id: tx.id,
-      side: tx.side,
-      ticker: tx.ticker,
-      shares: tx.shares,
-      price: tx.price,
-      trade_date: tx.trade_date,
-      split_from: tx.split_from,
-      split_to: tx.split_to,
-    }) as Tx;
+    .get(fields) as Tx;
+}
 
 export const deleteRow = (id: number) => db.prepare('DELETE FROM transactions WHERE id = ?').run(id);
 
