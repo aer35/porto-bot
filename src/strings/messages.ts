@@ -1,5 +1,5 @@
 import { date, money } from '../components/format.js';
-import type { Tx } from '../components/ledger.js';
+import type { Position, Tx } from '../components/ledger.js';
 
 // One transaction on one line. `shares` is [before, after] for split rows, when known.
 const txLine = (tx: Tx, shares?: [number, number]) =>
@@ -12,6 +12,9 @@ const txLine = (tx: Tx, shares?: [number, number]) =>
 // Every user-facing string lives here.
 export const messages = {
   txLine,
+  previous: 'Previous',
+  next: 'Next',
+  page: (page: number, pageCount: number) => `Page ${page + 1} of ${pageCount}`,
   unexpectedError: 'Something went wrong. Try again, and tell the server owner if it keeps happening.',
 
   options: {
@@ -19,7 +22,7 @@ export const messages = {
     shares: 'Number of whole shares',
     price: 'Price per share',
     date: 'Trade date as YYYY-MM-DD. Defaults to today',
-    user: 'Whose portfolio to show. Defaults to you',
+    user: 'Whose transactions to show. Defaults to you',
   },
 
   invalidTicker: 'Tickers are 1–6 letters or dots, like `AAPL` or `BRK.B`.',
@@ -38,5 +41,14 @@ export const messages = {
     body: (userId: string, holdings: string, recent: string[]) =>
       `## Portfolio of <@${userId}>\n**Holdings**\n${holdings}\n**Recent transactions**\n` +
       (recent.length ? recent.join('\n') : 'None yet.'),
+  },
+
+  position: {
+    description: 'Show every transaction for one ticker, with IDs for /amend and /delete',
+    none: (userId: string, ticker: string) => `<@${userId}> has no **${ticker}** transactions.`,
+    body: (userId: string, ticker: string, position: Position | undefined, lines: string[]) =>
+      `## ${ticker} — <@${userId}>\n` +
+      (position ? `Holding ${position.shares} shares @ ${money(position.avgCost)} avg\n\n` : 'No shares held\n\n') +
+      lines.join('\n'),
   },
 };
