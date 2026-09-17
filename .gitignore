@@ -1,0 +1,14 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Agents
+.claude/
+
+#OS
+.DS_Store
+
+# Secrets
+*.env.*
+!.env.example
