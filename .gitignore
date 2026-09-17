@@ -12,3 +12,10 @@
 # Secrets
 *.env.*
 !.env.example
+
+# `*.env.*` above does not match a bare `.env`
+.env
+
+# Build
+node_modules/
+dist/
