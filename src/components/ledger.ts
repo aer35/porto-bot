@@ -19,16 +19,14 @@ export type Replay =
   | { ok: true; positions: Position[]; history: { tx: Tx; shares: number }[] }
   | { ok: false; oversold: Tx };
 
-export const byLedgerOrder = (a: Tx, b: Tx) =>
-  a.trade_date - b.trade_date || a.created_at - b.created_at || a.id - b.id;
-
 // Replays one user's rows, in any order, into current positions using average cost.
 // `history` holds shares of that row's ticker after each row, for rendering split rows as "5 → 8".
 export function replay(rows: Tx[]): Replay {
   const held = new Map<string, { shares: number; avgCost: number }>();
   const history: { tx: Tx; shares: number }[] = [];
 
-  for (const tx of rows.toSorted(byLedgerOrder)) {
+  const ordered = rows.toSorted((a, b) => a.trade_date - b.trade_date || a.created_at - b.created_at || a.id - b.id);
+  for (const tx of ordered) {
     const pos = held.get(tx.ticker) ?? { shares: 0, avgCost: 0 };
 
     if (tx.sec_type === 'SPLIT') {
