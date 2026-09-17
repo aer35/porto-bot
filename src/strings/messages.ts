@@ -89,4 +89,12 @@ export const messages = {
     title: (ticker: string) => `Delete all your ${ticker} transactions?`,
     done: (ticker: string, count: number) => `Deleted ${count} of your **${ticker}** transactions.`,
   },
+
+  split: {
+    description: 'Apply a stock split to everyone holding a ticker (Manage Server only)',
+    ratioOption: 'New:old shares, e.g. 3:2 forward or 1:10 reverse',
+    invalidRatio: 'Ratio must be `X:Y` with two different whole numbers above 0, like `3:2` or `1:10`.',
+    done: (ticker: string, ratio: { split_to: number; split_from: number }, count: number) =>
+      `Applied a ${ratio.split_to}:${ratio.split_from} split to **${ticker}** for ${count} ${count === 1 ? 'member' : 'members'}.`,
+  },
 };

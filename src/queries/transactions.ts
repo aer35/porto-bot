@@ -51,3 +51,9 @@ export const deleteUserRows = (userId: string) =>
 // Removes every row a user has for one ticker, splits included. Returns how many rows were deleted.
 export const deleteUserTickerRows = (userId: string, ticker: string) =>
   Number(db.prepare('DELETE FROM transactions WHERE user_id = ? AND ticker = ?').run(userId, ticker).changes);
+
+// Users with any row for a ticker. Some may have sold out; callers replay to find current holders.
+export const usersWithTicker = (ticker: string) =>
+  (db.prepare('SELECT DISTINCT user_id FROM transactions WHERE ticker = ?').all(ticker) as { user_id: string }[]).map(
+    (r) => r.user_id,
+  );
