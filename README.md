@@ -59,4 +59,11 @@ docker compose cp bot:/data/porto.db ./porto-backup.db
 docker compose start bot
 ```
 
-To restore, stop the bot, copy the backup to `bot:/data/porto.db` with `docker compose cp`, and start it again.
+To restore, copy the backup back in and hand ownership to the container's `node` user, or the bot cannot write to it:
+
+```sh
+docker compose stop bot
+docker compose cp ./porto-backup.db bot:/data/porto.db
+docker compose run --rm --user root bot chown node:node /data/porto.db
+docker compose start bot
+```
