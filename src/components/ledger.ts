@@ -17,15 +17,17 @@ export type Tx = {
 
 export type Position = { ticker: string; shares: number; avgCost: number };
 
+// Shares of that row's ticker held after each row, in replay order.
+export type History = { tx: Tx; shares: number }[];
+
 export type Replay =
-  | { ok: true; positions: Position[]; history: { tx: Tx; shares: number }[] }
+  | { ok: true; positions: Position[]; history: History }
   | { ok: false; oversold: Tx };
 
 // Replays one user's rows, in any order, into current positions using average cost.
-// `history` holds shares of that row's ticker after each row, for rendering split rows as "5 → 8".
 export function replay(rows: Tx[]): Replay {
   const held = new Map<string, { shares: number; avgCost: number }>();
-  const history: { tx: Tx; shares: number }[] = [];
+  const history: History = [];
 
   const ordered = rows.toSorted((a, b) => a.trade_date - b.trade_date || a.created_at - b.created_at || a.id - b.id);
   for (const tx of ordered) {

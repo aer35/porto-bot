@@ -1,7 +1,5 @@
-import type { Replay } from './ledger.js';
+import type { History } from './ledger.js';
 import { messages } from '../strings/messages.js';
-
-type History = Extract<Replay, { ok: true }>['history'];
 
 // One line per row, oldest first. Tracks each ticker's previous share count so split rows can show "5 → 8".
 export function historyLines(history: History) {

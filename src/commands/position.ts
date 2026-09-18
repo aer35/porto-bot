@@ -27,10 +27,7 @@ export const data = new SlashCommandBuilder()
 // Page `page` (clamped, since rows may have changed since the buttons were sent), newest first.
 function render(userId: string, ticker: string, page: number) {
   const { positions, history } = ledgerOf(userId);
-  // Replay the whole ledger before filtering so split rows get the right before/after counts.
-  const lines = historyLines(history)
-    .filter((_, i) => history[i].tx.ticker === ticker)
-    .reverse();
+  const lines = historyLines(history.filter(({ tx }) => tx.ticker === ticker)).reverse();
   if (!lines.length) throw new UserError(messages.position.none(userId, ticker));
 
   // The current holding as a one-row table, matching the holdings table in /portfolio.
