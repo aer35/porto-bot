@@ -6,6 +6,7 @@ let nextId = 1;
 const DAY = 86_400;
 const row = (fields: Partial<Tx>): Tx => ({
   id: nextId++,
+  ref: `BS${nextId}`,
   user_id: 'u1',
   sec_type: 'STOCK',
   side: null,
@@ -129,7 +130,7 @@ test('history records shares held of that ticker after each row, in replay order
 
 test('applyChange insert appends a row that sorts after existing rows on the same date', () => {
   const b = buy(10, 100, 1, { created_at: 50 });
-  const { id, created_at, ...fields } = sell(10, 100, 1);
+  const { id, created_at, ref, ...fields } = sell(10, 100, 1);
   const next = applyChange([b], { insert: fields });
   assert.equal(next.length, 2);
   assert.equal(replay(next).ok, true);

@@ -18,7 +18,7 @@ export const messages = {
   confirmMismatch: 'That did not match. Nothing was deleted.',
   notAllowed: 'You need the Manage Server permission to do that.',
   cancelled: 'Cancelled. Nothing was changed.',
-  notYourRow: (id: number) => `You have no transaction #${id}. Find your IDs with /position.`,
+  notYourRow: (ref: string) => `You have no transaction \`${ref}\`. Find your IDs with /position.`,
   previous: 'Previous',
   next: 'Next',
   page: (page: number, pageCount: number) => `Page ${page + 1} of ${pageCount}`,
@@ -30,10 +30,11 @@ export const messages = {
     price: 'Price per share',
     date: 'Trade date as YYYY-MM-DD. Defaults to today',
     user: 'Whose transactions to show. Defaults to you',
-    id: 'Transaction ID, shown as #123 in /position',
+    id: 'Transaction ID, e.g. BS01, shown next to each transaction',
   },
 
   invalidTicker: 'Tickers are 1–6 letters or dots, like `AAPL` or `BRK.B`.',
+  invalidRef: 'Transaction IDs look like `BS01` (buy), `SS01` (sell) or `SP01` (split).',
   invalidShares: 'Shares must be a whole number above 0.',
   invalidPrice: 'Price must be a number, 0 or more.',
   invalidDate: 'Dates must be `YYYY-MM-DD` and not in the future.',
@@ -70,7 +71,7 @@ export const messages = {
 
   amend: {
     description: 'Edit one of your transactions',
-    title: (id: number) => `Amend transaction #${id}`,
+    title: (ref: string) => `Amend transaction ${ref}`,
     fields: { ticker: 'Ticker', side: 'Side (BUY or SELL)', shares: 'Shares', price: 'Price per share', date: 'Date (YYYY-MM-DD)' },
     split: 'Split rows cannot be amended. Use /delete to undo a split.',
     invalidSide: 'Side must be `BUY` or `SELL`.',

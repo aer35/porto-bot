@@ -1,6 +1,8 @@
 // A row of the transactions table (migrations/001_transactions.sql).
 export type Tx = {
   id: number;
+  // Human-facing reference like BS01 (src/components/ref.ts).
+  ref: string;
   user_id: string;
   sec_type: 'STOCK' | 'SPLIT';
   side: 'BUY' | 'SELL' | null;
@@ -53,15 +55,19 @@ export function replay(rows: Tx[]): Replay {
 }
 
 // A row as written by an insert, before the database assigns id and created_at.
-export type NewTx = Omit<Tx, 'id' | 'created_at'>;
+export type NewTx = Omit<Tx, 'id' | 'created_at' | 'ref'>;
 
 export type Change = { insert: NewTx } | { update: Tx } | { delete: Tx };
 
 // The user's rows as they would be after `change`, for replay validation before anything is written.
 export function applyChange(rows: Tx[], change: Change): Tx[] {
   if ('insert' in change) {
-    // Stand-ins for what the database will assign: now, and an id above every existing row.
-    return [...rows, { ...change.insert, id: Number.MAX_SAFE_INTEGER, created_at: Math.floor(Date.now() / 1000) }];
+    // Stand-ins for what the database will assign: now, an id above every existing row, and the
+    // reference, which only matters once the row is stored.
+    return [
+      ...rows,
+      { ...change.insert, id: Number.MAX_SAFE_INTEGER, created_at: Math.floor(Date.now() / 1000), ref: '' },
+    ];
   }
   if ('update' in change) return rows.map((row) => (row.id === change.update.id ? change.update : row));
   return rows.filter((row) => row.id !== change.delete.id);

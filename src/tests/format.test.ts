@@ -20,7 +20,7 @@ test('money keeps at least 2 and at most 4 decimals', () => {
 });
 
 test('historyLines shows share counts before and after a split', () => {
-  const base = { user_id: 'u', created_at: 0, price: null, shares: null, side: null, split_from: null, split_to: null };
+  const base = { user_id: 'u', created_at: 0, ref: 'XX01', price: null, shares: null, side: null, split_from: null, split_to: null };
   const rows: Tx[] = [
     { ...base, id: 1, sec_type: 'STOCK', side: 'BUY', ticker: 'AAPL', shares: 5, price: 10, trade_date: 1 },
     { ...base, id: 2, sec_type: 'STOCK', side: 'BUY', ticker: 'MSFT', shares: 1, price: 10, trade_date: 2 },

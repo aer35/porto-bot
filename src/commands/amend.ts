@@ -12,13 +12,14 @@ import { config } from '../config.js';
 import { ownRow } from '../components/ownRow.js';
 import { commitChange } from '../components/userLedger.js';
 import { UserError } from '../components/userError.js';
+import { parseRef } from '../components/ref.js';
 import { parseDate, parsePrice, parseShares, parseTicker, toDateString } from '../components/validate.js';
 import { messages } from '../strings/messages.js';
 
 export const data = new SlashCommandBuilder()
   .setName('amend')
   .setDescription(messages.amend.description)
-  .addIntegerOption((o) => o.setName('id').setDescription(messages.options.id).setRequired(true).setMinValue(1));
+  .addStringOption((o) => o.setName('id').setDescription(messages.options.id).setRequired(true));
 
 const field = (id: string, label: string, value: string) =>
   new LabelBuilder()
@@ -26,15 +27,17 @@ const field = (id: string, label: string, value: string) =>
     .setTextInputComponent(new TextInputBuilder().setCustomId(id).setStyle(TextInputStyle.Short).setValue(value));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  const row = ownRow(interaction.options.getInteger('id', true), interaction.user.id);
+  const ref = parseRef(interaction.options.getString('id', true));
+  if (!ref) throw new UserError(messages.invalidRef);
+  const row = ownRow(ref, interaction.user.id);
   // Split rows are undone with /delete; amending a ratio has no clear meaning for one holder.
   if (row.sec_type === 'SPLIT') throw new UserError(messages.amend.split);
 
   const labels = messages.amend.fields;
   await interaction.showModal(
     new ModalBuilder()
-      .setCustomId(`amend:${row.id}`)
-      .setTitle(messages.amend.title(row.id))
+      .setCustomId(`amend:${row.ref}`)
+      .setTitle(messages.amend.title(row.ref))
       .addLabelComponents(
         field('ticker', labels.ticker, row.ticker),
         field('side', labels.side, row.side!),
@@ -45,7 +48,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   );
 }
 
-export async function modal(interaction: ModalSubmitInteraction, [id]: string[]) {
+export async function modal(interaction: ModalSubmitInteraction, [ref]: string[]) {
   const value = (name: string) => interaction.fields.getTextInputValue(name);
   const ticker = parseTicker(value('ticker'));
   if (!ticker) throw new UserError(messages.invalidTicker);
@@ -59,7 +62,7 @@ export async function modal(interaction: ModalSubmitInteraction, [id]: string[])
   if (trade_date === null) throw new UserError(messages.invalidDate);
 
   // Re-check: the row may have been deleted while the modal was open.
-  const row = ownRow(Number(id), interaction.user.id);
+  const row = ownRow(ref, interaction.user.id);
   const stored = commitChange(interaction.user.id, { update: { ...row, ticker, side, shares, price, trade_date } })!;
   await interaction.reply({ embeds: [new EmbedBuilder().setDescription(messages.amend.done(interaction.user.id, stored))] });
 }
