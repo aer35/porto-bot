@@ -27,15 +27,15 @@ Design bias throughout: the bot tracks what users tell it. It does not validate 
 | `/position` | `ticker` (required), `user` (optional) | Public |
 | `/buy` | `ticker`, `shares`, `price`, `date` (optional) | Public on success |
 | `/sell` | `ticker`, `shares`, `price`, `date` (optional) | Public on success |
-| `/amend` | `id` (required) → opens prefilled modal | Ephemeral while editing, public on success |
-| `/delete` | `id` (required) → Confirm/Cancel buttons | Ephemeral |
+| `/amend` | `id` (transaction reference, e.g. `BS01`) → opens prefilled modal | Ephemeral while editing, public on success |
+| `/delete` | `id` (transaction reference, e.g. `BS01`) → Confirm/Cancel buttons | Ephemeral |
 | `/clear` | `ticker` (required) → modal, type ticker to confirm | Ephemeral |
 | `/reset` | `user` (required) → modal confirm | Ephemeral |
 | `/split` | `ticker`, `ratio` as `X:Y` | Public |
 
 **`/portfolio`** — Renders two tables: current holdings (ticker, shares, average cost) and the user's last ~10 transactions. The transaction cap keeps the bot from flooding a channel; `/position` is how a user sees more.
 
-**`/position`** — All transactions for one ticker, each row showing its transaction ID so it can be amended or deleted. Paginated.
+**`/position`** — All transactions for one ticker, each row showing its transaction reference so it can be amended or deleted, above a one-row table of the current holding. Paginated.
 
 **`/buy` / `/sell`** — Price is per share. `date` accepts `YYYY-MM-DD`, past dates only, defaults to today. On success the bot posts a public confirmation showing the transaction exactly as recorded in the database.
 
@@ -52,16 +52,64 @@ Design bias throughout: the bot tracks what users tell it. It does not validate 
 ### Behavior
 
 - **Errors are always ephemeral.** Only the user who made the mistake sees it.
+- **Every write is logged.** One line per stored change goes to stdout, so `docker compose logs bot` is a record of every transaction and the first place to look when a number is disputed.
 - **Ticker validation** is a format check only (`^[A-Z.]{1,6}$`, uppercased). The bot does not know which tickers are real. Use Discord's native autocomplete on `/sell` and `/position` to suggest from the user's existing holdings.
 - **Dates** are stored as UTC. Display uses Discord's `<t:unix:D>` timestamp markup so each viewer sees their own local date. Ordering within a single day comes from the row's insert timestamp.
 - **Pagination** uses Discord message components. The 15-minute interaction token expiry is accepted — a stale page means the user re-runs the command.
+
+### Transaction references
+
+Users never see the database's integer id. Every transaction has a reference: two letters for its
+type, then how many of that type the bot has recorded, padded to at least two digits — `BS01`,
+`SS02`, `BS133`. This is what `/amend` and `/delete` take, and what `/position` shows.
+
+Prefixes are one shared namespace. **Do not reuse one**, and add new types here:
+
+| Prefix | Transaction |
+|---|---|
+| `BS` | Buy shares |
+| `SS` | Sell shares |
+| `SL` | Split (not `SP`, which V2 needs for a sold put) |
+| `BC` / `SC` | V2: buy / sell call |
+| `BP` / `SP` | V2: buy / sell put |
+
+Numbers come from a `ref_counters` table, one row per prefix, and only ever go up. A deleted
+transaction's reference is never handed to a later one. Counters are global, not per user, so a
+reference identifies exactly one transaction across the whole bot. An `/amend` that changes a
+transaction's type (BUY to SELL) issues a new reference, so a `BS` row is never really a sell.
+
+### Display paradigm
+
+Every transaction renders the same way, everywhere it appears, in two lines:
+
+```
+**ACTION** QUANTITY × UNIT of **TICKER** @ UNIT_PRICE
+`REF` · total TOTAL · DATE
+```
+
+```
+**BUY** 10 × shares of **AAPL** @ $150.00
+`BS01` · total $1,500.00 · <t:1767268800:D>
+```
+
+- The first line is what happened, the second is the bookkeeping. Nothing else goes on either line.
+- A type with no unit price, like a split, keeps its detail on the first line and drops the total:
+  `**SPLIT** 3:2 of **AAPL** — 5 → 8 shares`.
+- New types fill the same slots rather than inventing a layout. A V2 option is
+  `**BUY** 2 × CALL of **AAPL** $150 2026-01-16 @ $3.20`.
+- Public confirmations add a bold header and the user: `**Trade recorded**` then `<@id> ` before
+  the action line.
+- Lists (`/portfolio`, `/position`) separate entries with a thin rule, never run them together.
+- Per-share prices show up to 4 decimals (`money`), amounts of actual money show exactly 2
+  (`total`). Dates are always `<t:unix:D>`, which is why transaction lists cannot be code blocks.
+- Holdings are a code-block table: ticker, shares, average cost, cost basis.
 
 ### Infrastructure
 
 - **SQLite**, single file on a mounted Docker volume.
 - **Schema migrations** run on boot: `PRAGMA user_version` plus numbered `.sql` files. No ORM.
 - **Docker Compose** with a `dev` profile that bind-mounts `./src` and runs `tsx watch` for live reload; production runs the built image.
-- **GitHub Actions** builds and pushes to GHCR on tag.
+- **GitHub Actions** builds and pushes to GHCR on every merge to `main`. A `VERSION` file at the repo root holds `MAJOR.MINOR.PATCH`, and a `-beta` suffix publishes a GitHub pre-release. Only a new `MAJOR.MINOR` creates a release; a patch is appended to the release it fixes as a "Patches" bullet, and still ships `latest`, `sha-<short>` and its exact version tag. Change `VERSION` in the same PR as the work it releases.
 
 ## Future Versions & Notes
 
@@ -123,7 +171,11 @@ src/
   strings/      all user-facing text
   tests/
 migrations/     numbered .sql files
+public/         static resources: the bot avatar, images, anything not code
 ```
+
+`public/` is where resources live. Nothing in it is loaded at runtime — the avatar is uploaded by
+hand in the Discord Developer Portal — but it is the one place to look for them.
 
 Anything that gets reused belongs in its own file. Keep functions and components separate and abstract enough that they can be lifted and used elsewhere without dragging context along. No user-facing string should be written inline in a command file — it goes in `strings/`.
 

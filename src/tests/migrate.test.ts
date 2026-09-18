@@ -78,12 +78,12 @@ test('002 backfills references for rows written before it, and seeds the counter
 
   assert.deepEqual(
     db.prepare('SELECT ref FROM transactions ORDER BY id').all().map((r) => r.ref),
-    ['BS01', 'SS01', 'BS02', 'SP01'],
+    ['BS01', 'SS01', 'BS02', 'SL01'],
   );
   const counters = db.prepare('SELECT prefix, next FROM ref_counters ORDER BY prefix').all();
   assert.deepEqual(counters.map(({ prefix, next }) => ({ prefix, next })), [
     { prefix: 'BS', next: 3 },
-    { prefix: 'SP', next: 2 },
+    { prefix: 'SL', next: 2 },
     { prefix: 'SS', next: 2 },
   ]);
 });

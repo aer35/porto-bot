@@ -8,7 +8,8 @@ Each server runs its own instance. Everything recorded is visible to everyone in
 
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications) and click **New Application**.
 2. **Bot** → **Reset Token**, then copy the token. No privileged intents are needed.
-3. **OAuth2** → **URL Generator**: tick the `bot` and `applications.commands` scopes, and under bot permissions tick **Send Messages** and **Embed Links**. Open the generated URL and add the bot to your server.
+3. Still on **Bot**, click the avatar box and upload a profile image. This repository ships one at [`public/avatar.png`](public/avatar.png). The bot does not set its own avatar, so this is the only place it can be changed, and the name next to it is what members see.
+4. **OAuth2** → **URL Generator**: tick the `bot` and `applications.commands` scopes, and under bot permissions tick **Send Messages** and **Embed Links**. Open the generated URL and add the bot to your server.
 
 ## 2. Configure
 
@@ -46,6 +47,10 @@ docker compose run --rm bot node dist/register.js
 ```
 
 Database migrations run automatically on startup.
+
+## Versions
+
+`docker compose up -d` pulls `latest`. To pin a version, set `image:` in `compose.yaml` to a tag from the [releases](https://github.com/aer35/porto-bot/releases), e.g. `ghcr.io/aer35/porto-bot:1.0.0`. Versions marked as pre-releases are `-beta` builds; use a plain version for a stable one. Patch versions have no release of their own — they are listed under **Patches** in the release they fix.
 
 ## Data and backups
 

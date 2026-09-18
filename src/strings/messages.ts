@@ -53,7 +53,7 @@ export const messages = {
   },
 
   invalidTicker: 'Tickers are 1–6 letters or dots, like `AAPL` or `BRK.B`.',
-  invalidRef: 'Transaction IDs look like `BS01` (buy), `SS01` (sell) or `SP01` (split).',
+  invalidRef: 'Transaction IDs look like `BS01` (buy), `SS01` (sell) or `SL01` (split).',
   invalidShares: 'Shares must be a whole number above 0.',
   invalidPrice: 'Price must be a number, 0 or more.',
   invalidDate: 'Dates must be `YYYY-MM-DD` and not in the future.',

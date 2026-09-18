@@ -1,4 +1,4 @@
--- Human-facing transaction references (BS01, SS02, SP01). Users type these into /amend and
+-- Human-facing transaction references (BS01, SS02, SL01). Users type these into /amend and
 -- /delete; the integer id stays the primary key and is never shown.
 ALTER TABLE transactions ADD COLUMN ref TEXT;
 
@@ -12,9 +12,9 @@ CREATE TABLE ref_counters (
 -- Backfill rows written before this migration, numbering each type oldest first.
 WITH numbered AS (
   SELECT id,
-         CASE WHEN sec_type = 'SPLIT' THEN 'SP' WHEN side = 'BUY' THEN 'BS' ELSE 'SS' END AS prefix,
+         CASE WHEN sec_type = 'SPLIT' THEN 'SL' WHEN side = 'BUY' THEN 'BS' ELSE 'SS' END AS prefix,
          ROW_NUMBER() OVER (
-           PARTITION BY CASE WHEN sec_type = 'SPLIT' THEN 'SP' WHEN side = 'BUY' THEN 'BS' ELSE 'SS' END
+           PARTITION BY CASE WHEN sec_type = 'SPLIT' THEN 'SL' WHEN side = 'BUY' THEN 'BS' ELSE 'SS' END
            ORDER BY id
          ) AS seq
   FROM transactions

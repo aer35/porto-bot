@@ -8,7 +8,7 @@ const tx = (fields: Partial<Tx>) => ({ sec_type: 'STOCK', side: 'BUY', ...fields
 test('refPrefix names the transaction type', () => {
   assert.equal(refPrefix(tx({})), 'BS');
   assert.equal(refPrefix(tx({ side: 'SELL' })), 'SS');
-  assert.equal(refPrefix(tx({ sec_type: 'SPLIT', side: null })), 'SP');
+  assert.equal(refPrefix(tx({ sec_type: 'SPLIT', side: null })), 'SL');
 });
 
 test('formatRef pads to at least two digits and grows past them', () => {
