@@ -6,6 +6,7 @@ import {
   type ModalSubmitInteraction,
 } from 'discord.js';
 import { confirmModal, typedMatches } from '../components/confirmModal.js';
+import { logTx } from '../components/log.js';
 import { UserError } from '../components/userError.js';
 import { deleteUserRows } from '../queries/transactions.js';
 import { messages } from '../strings/messages.js';
@@ -27,5 +28,6 @@ export async function modal(interaction: ModalSubmitInteraction, [userId, userna
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) throw new UserError(messages.notAllowed);
   if (!typedMatches(interaction, username)) throw new UserError(messages.confirmMismatch);
   const count = deleteUserRows(userId);
+  logTx('reset', userId, `rows=${count} by=${interaction.user.id}`);
   await interaction.reply({ content: messages.reset.done(userId, count), flags: MessageFlags.Ephemeral });
 }

@@ -5,6 +5,7 @@ import {
   type ModalSubmitInteraction,
 } from 'discord.js';
 import { confirmModal, typedMatches } from '../components/confirmModal.js';
+import { logTx } from '../components/log.js';
 import { UserError } from '../components/userError.js';
 import { parseTicker } from '../components/validate.js';
 import { deleteUserTickerRows } from '../queries/transactions.js';
@@ -25,5 +26,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 export async function modal(interaction: ModalSubmitInteraction, [ticker]: string[]) {
   if (!typedMatches(interaction, ticker)) throw new UserError(messages.confirmMismatch);
   const count = deleteUserTickerRows(interaction.user.id, ticker);
+  logTx('clear', interaction.user.id, `${ticker} rows=${count}`);
   await interaction.reply({ content: messages.clear.done(ticker, count), flags: MessageFlags.Ephemeral });
 }

@@ -5,13 +5,14 @@ import {
   type ButtonInteraction,
   type ChatInputCommandInteraction,
 } from 'discord.js';
+import { table } from '../components/format.js';
 import { historyLines } from '../components/historyLines.js';
 import { pageButtons } from '../components/pageButtons.js';
 import { tickerAutocomplete } from '../components/tickerAutocomplete.js';
 import { ledgerOf } from '../components/userLedger.js';
 import { UserError } from '../components/userError.js';
 import { parseTicker } from '../components/validate.js';
-import { messages } from '../strings/messages.js';
+import { holdingRow, messages } from '../strings/messages.js';
 
 const PAGE_SIZE = 10;
 
@@ -32,15 +33,14 @@ function render(userId: string, ticker: string, page: number) {
     .reverse();
   if (!lines.length) throw new UserError(messages.position.none(userId, ticker));
 
+  // The current holding as a one-row table, matching the holdings table in /portfolio.
+  const held = positions.find((p) => p.ticker === ticker);
+  const summary = held ? table([messages.portfolio.columns, holdingRow(held)]) : messages.position.noShares;
+
   const pageCount = Math.ceil(lines.length / PAGE_SIZE);
   page = Math.min(Math.max(page, 0), pageCount - 1);
   const embed = new EmbedBuilder().setDescription(
-    messages.position.body(
-      userId,
-      ticker,
-      positions.find((p) => p.ticker === ticker),
-      lines.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
-    ),
+    messages.position.body(userId, ticker, summary, lines.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)),
   );
   if (pageCount === 1) return { embeds: [embed], components: [] };
   embed.setFooter({ text: messages.page(page, pageCount) });

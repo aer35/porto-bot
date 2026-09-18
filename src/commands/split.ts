@@ -1,5 +1,6 @@
 import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder, type ChatInputCommandInteraction } from 'discord.js';
 import { config } from '../config.js';
+import { logTx } from '../components/log.js';
 import { commitChange, ledgerOf } from '../components/userLedger.js';
 import { UserError } from '../components/userError.js';
 import { parseDate, parseRatio, parseTicker } from '../components/validate.js';
@@ -30,6 +31,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       insert: { user_id, sec_type: 'SPLIT', side: null, ticker, shares: null, price: null, trade_date, ...ratio },
     });
   }
+  logTx('split', interaction.user.id, `${ticker} ${ratio.split_to}:${ratio.split_from} holders=${holders.length}`);
   await interaction.reply({
     embeds: [new EmbedBuilder().setDescription(messages.split.done(ticker, ratio, holders.length))],
   });
