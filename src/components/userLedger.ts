@@ -1,5 +1,5 @@
 import { applyChange, replay, type Change, type Tx } from './ledger.js';
-import { logTx, txDetail } from './log.js';
+import { logRow } from './log.js';
 import { deleteRow, insertRow, updateRow, userRows } from '../queries/transactions.js';
 import { messages } from '../strings/messages.js';
 import { UserError } from './userError.js';
@@ -17,13 +17,8 @@ export function ledgerOf(userId: string) {
 export function commitChange(userId: string, change: Change): Tx | undefined {
   const result = replay(applyChange(userRows(userId), change));
   if (!result.ok) throw new UserError(messages.oversold(result.oversold));
-  if ('insert' in change) return logged('insert', insertRow(change.insert));
-  if ('update' in change) return logged('update', updateRow(change.update));
+  if ('insert' in change) return logRow('insert', insertRow(change.insert));
+  if ('update' in change) return logRow('update', updateRow(change.update));
   deleteRow(change.delete.id);
-  logged('delete', change.delete);
-}
-
-function logged(event: string, tx: Tx) {
-  logTx(event, tx.user_id, txDetail(tx));
-  return tx;
+  logRow('delete', change.delete);
 }
