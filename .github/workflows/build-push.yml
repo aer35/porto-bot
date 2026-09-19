@@ -70,33 +70,50 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: read
     env:
+      GH_TOKEN: ${{ github.token }}
       V: ${{ needs.image.outputs.version }}
     steps:
       - uses: actions/checkout@v5
+
+      # Release notes come from the pull request this commit merged, so they are written once.
+      - run: |
+          pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '.[0].number // empty')
+          if [[ -n $pr ]]; then
+            gh pr view "$pr" --repo "$GITHUB_REPOSITORY" --json body -q .body > pr-body.md
+          else
+            : > pr-body.md
+          fi
+          PR_NUMBER=$pr VERSION=$V python3 .github/render-release-notes.py pr-body.md .github/release_template.md > release-body.md
+          cat release-body.md
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.V }}
           name: v${{ env.V }}
           prerelease: ${{ contains(needs.image.outputs.version, '-') }}
           generate_release_notes: true
-          body: |
-            Image: `ghcr.io/${{ github.repository_owner }}/porto-bot:${{ env.V }}`
+          body_path: release-body.md
 
   # A patch gets no release of its own; it is appended to the MAJOR.MINOR release it fixes.
   patch-notes:
     needs: image
     if: github.event_name == 'push' && needs.image.outputs.release == 'false'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     env:
       GH_TOKEN: ${{ github.token }}
       V: ${{ needs.image.outputs.version }}
       MM: ${{ needs.image.outputs.minor }}
       SUBJECT: ${{ github.event.head_commit.message }}
+    permissions:
+      contents: write
+      pull-requests: read
     steps:
       - run: |
+          # Prefer the pull request title; a merge commit's subject is just "Merge pull request #2 ...".
+          title=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '.[0].title // empty')
+          [[ -n $title ]] && SUBJECT=$title
           tag=$(gh release list --limit 100 --json tagName -q '.[].tagName' \
                   --repo "$GITHUB_REPOSITORY" | grep "^v${MM//./\\.}\." | head -1)
           if [[ -z $tag ]]; then
