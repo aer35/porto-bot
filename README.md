@@ -68,6 +68,7 @@ Make a new folder anywhere on the machine that runs Docker, for example `porto-b
 services:
   porto-bot:
     image: ghcr.io/aer35/porto-bot:latest
+    container_name: porto-bot
     env_file: .env
     volumes:
       - data:/data
@@ -96,6 +97,8 @@ DB_PATH=/data/porto.db
 # Find yours here: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 TZ=America/New_York
 ```
+
+The `container_name` line gives the container a predictable name, so commands like `docker logs porto-bot` work no matter what you called the folder. That name has to be unique on the machine, so to run a second copy alongside the first, use a separate folder and change both the service name and `container_name` to something else, such as `porto-bot-2`.
 
 Do not put quotes around the values, and do not leave spaces around the `=`.
 
@@ -144,17 +147,19 @@ That's it. The bot is ready to use.
 
 ## Using the bot
 
-| Command      | What it does                                                                                   |
-|--------------|------------------------------------------------------------------------------------------------|
-| `/buy`       | Record shares you bought: ticker, number of shares, price per share, and an optional past date |
-| `/sell`      | Record shares you sold                                                                         |
-| `/portfolio` | Show your holdings and recent transactions. Add a user to see someone else's                   |
-| `/position`  | Show every transaction for one ticker                                                          |
-| `/amend`     | Fix a transaction you entered wrong                                                            |
-| `/delete`    | Remove a transaction                                                                           |
-| `/clear`     | Remove all of your transactions for one ticker                                                 |
-| `/reset`     | Erase a member's entire history                                                                |
-| `/split`     | Apply a stock split to everyone holding a ticker                                               |
+| Command | What it does | Required | Optional |
+|---|---|---|---|
+| `/buy` | Record shares you bought | `ticker`, `shares`, `price` | `date` |
+| `/sell` | Record shares you sold | `ticker`, `shares`, `price` | `date` |
+| `/portfolio` | Show holdings and recent transactions | — | `user` |
+| `/position` | Show every transaction for one ticker | `ticker` | `user` |
+| `/amend` | Fix a transaction you entered wrong | `id` | — |
+| `/delete` | Remove a transaction | `id` | — |
+| `/clear` | Remove all of your transactions for one ticker | `ticker` | — |
+| `/reset` | Erase a member's entire history | `user` | — |
+| `/split` | Apply a stock split to everyone holding a ticker | `ticker`, `ratio` | — |
+
+What the options mean: `ticker` is the symbol, like `AAPL`. `shares` is a whole number. `price` is the price per share. `date` is `YYYY-MM-DD` and cannot be in the future; leave it out for today. `user` picks whose transactions to show, and defaults to you. `id` is a transaction ID such as `BS01`. `ratio` is the split, written as new:old, such as `3:2` or `1:10`.
 
 A few things worth knowing:
 

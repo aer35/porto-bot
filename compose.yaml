@@ -1,6 +1,10 @@
 services:
   porto-bot:
     image: ghcr.io/aer35/porto-bot:latest
+    # Fixed container name, so it reads the same on every host instead of picking up the folder
+    # name. It must be unique on the machine: for a second copy, change the service name and this
+    # to match, e.g. porto-bot-2.
+    container_name: porto-bot
     env_file: .env
     volumes:
       - data:/data
@@ -10,6 +14,7 @@ services:
   # production bot starts too and both answer every command. Separate volume, so dev data stays apart.
   porto-bot-dev:
     profiles: [dev]
+    container_name: porto-bot-dev
     build:
       context: .
       target: build
