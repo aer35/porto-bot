@@ -1,0 +1,18 @@
+# The version of the image and of the GitHub release.
+#
+# Write MAJOR.MINOR.PATCH with no "v" at the start. A suffix after a hyphen,
+# for example 1.1.0-beta or 1.1.0-beta.2, is published as a pre-release.
+# Any other value stops the build and prints an error.
+#
+# Only a new MAJOR.MINOR creates a release:
+#
+#   breaks an existing setup   1.4.2 -> 2.0.0   release
+#   new feature                1.4.2 -> 1.5.0   release
+#   fix only                   1.4.2 -> 1.4.3   no release, appended to the v1.4 release notes
+#
+# Every merge to main publishes the image as `latest`, `sha-<short>` and the
+# exact version, so a patch still reaches the container without a release.
+#
+# Change this file in the same PR as the work it releases.
+
+1.0.0-beta
