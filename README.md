@@ -1,8 +1,10 @@
 # porto-bot
 
-A Discord bot that keeps a shared stock portfolio for your server. Members type in the trades they made elsewhere, and the bot keeps the running tally: who holds what, at what average cost, with a full history.
+A Discord bot that keeps a shared stock portfolio for your server. Members type in the trades they made elsewhere, and
+the bot keeps the running tally: who holds what, at what average cost, with a full history.
 
-It is **paper trading only**. There is no real money, no real orders, and no connection to any brokerage. The bot tracks whatever people tell it.
+It is **paper trading only**. There is no real money, no real orders, and no connection to any brokerage. The bot tracks
+whatever people tell it.
 
 You run your own copy, and everything recorded in it is visible to everyone in your server.
 
@@ -12,34 +14,45 @@ You run your own copy, and everything recorded in it is visible to everyone in y
 
 You need three things:
 
-- **A Discord server you manage.** If you do not have one, click the **+** at the bottom of your server list in Discord and choose **Create My Own**.
-- **Somewhere to run Docker.** A spare computer, a home server or NAS, or a cloud VPS all work. Install [Docker](https://docs.docker.com/get-started/get-docker/) if you do not have it. Anything that can run Docker containers can run this bot.
+- **A Discord server you manage.** If you do not have one, click the **+** at the bottom of your server list in Discord
+  and choose **Create My Own**.
+- **Somewhere to run Docker.** A spare computer, a home server or NAS, or a cloud VPS all work.
+  Install [Docker](https://docs.docker.com/get-started/get-docker/) if you do not have it. Anything that can run Docker
+  containers can run this bot.
 - **About 15 minutes.**
 
-You do not need to download this project's code. The bot ships as a prebuilt image.
+You do not need to download this project's code. The bot ships as a prebuilt image. There is a single image you can
+download and use for the avatar but it is not necessary. Feel free to use your own.
 
 ---
 
 ## Step 1 — Create your bot in Discord
 
-Discord requires every bot to be registered as an "application". This gives you a **token**, which is the password your copy of the bot uses to log in.
+Discord requires every bot to be registered as an "application". This gives you a **token**, which is the password your
+copy of the bot uses to log in.
 
-1. Go to the [Discord Developer Portal](https://discord.com/developers/applications) and sign in with your normal Discord account.
-2. Click **New Application**, give it a name (this is the name members will see, for example `porto-bot`), accept the terms, and click **Create**.
+1. Go to the [Discord Developer Portal](https://discord.com/developers/applications) and sign in with your normal
+   Discord account.
+2. Click **New Application**, give it a name (this is the name members will see, for example `porto-bot`), accept the
+   terms, and click **Create**.
 3. On the **General Information** page, find **Application ID** and copy it somewhere safe. You will need it in Step 2.
+    - Click the avatar image to upload a profile picture. This project includes one you can use
+      at [`public/avatar.png`](public/avatar.png). You don't need to use this picture, in fact you don't need an avatar
+      at all. The bot cannot set its own picture, so this is the only place to change it. You can also set the avatar
+      later.
 4. Click **Bot** in the left sidebar.
-   - Click the avatar image to upload a profile picture. This project includes one you can use at [`public/avatar.png`](public/avatar.png). The bot cannot set its own picture, so this is the only place to change it.
-   - Click **Reset Token**, confirm, then **Copy**. Save it somewhere safe.
-   - **Treat this token like a password.** Anyone who has it can control your bot. Never post it anywhere. If it leaks, come back here and click **Reset Token** to invalidate the old one.
-   - Leave every switch under **Privileged Gateway Intents** turned off. This bot does not need them.
+    - Click **Reset Token**, confirm, then **Copy**. Save it somewhere safe.
+    - **Treat this token like a password.** Anyone who has it can control your bot. Never post it anywhere. If it leaks,
+      come back here and click **Reset Token** to invalidate the old one.
+    - Leave every switch under **Privileged Gateway Intents** turned off. This bot does not need them.
 5. Invite the bot to your server:
-   - Click **OAuth2** in the sidebar, and find **OAuth2 URL Generator**.
-   - Under **Scopes**, tick **bot** and **applications.commands**.
-   - Under **Bot Permissions**, tick **Send Messages** and **Embed Links**.
-   - Copy the link that appears at the bottom, open it in a new browser tab, pick your server, and click **Authorize**.
+    - Click **OAuth2** in the sidebar, and find **OAuth2 URL Generator**.
+    - Under **Scopes**, tick **bot** and **applications.commands**. You will need both.zzzzzzzzzzzzzzzzzz
+    - Under **Bot Permissions**, tick **Send Messages** and **Embed Links**.
+    - Copy the link that appears at the bottom, open it in a new browser tab, pick your server, and click **Authorize**.
 6. Get your server's ID:
-   - In Discord, open **User Settings** (the gear icon) → **Advanced**, and turn on **Developer Mode**.
-   - Right-click your server's icon in the server list and choose **Copy Server ID**.
+    - In Discord, open **User Settings** (the gear icon) → **Advanced**, and turn on **Developer Mode**.
+    - Right-click your server's icon in the server list and choose **Copy Server ID**.
 
 You should now have three values saved: an **application ID**, a **bot token**, and a **server ID**.
 
@@ -53,7 +66,7 @@ Make a new folder anywhere on the machine that runs Docker, for example `porto-b
 
 ```yaml
 services:
-  bot:
+  porto-bot:
     image: ghcr.io/aer35/porto-bot:latest
     env_file: .env
     volumes:
@@ -86,11 +99,15 @@ TZ=America/New_York
 
 Do not put quotes around the values, and do not leave spaces around the `=`.
 
-> **Using a Docker interface instead of a terminal?** If you manage Docker through something like Portainer, Unraid or a NAS app, paste the `compose.yaml` above into its stack or compose editor. If it gives you fields for environment variables, enter the settings there and delete the `env_file: .env` line.
+> **Using a Docker interface instead of a terminal?** If you manage Docker through something like Portainer, Unraid or a
+> NAS app, paste the `compose.yaml` above into its stack or compose editor. If it gives you fields for environment
+> variables, enter the settings there and delete the `env_file: .env` line. Additional configuration may be required. Refer to your interface's documentation for details.
 
 ---
 
 ## Step 3 — Start the bot
+
+>If you are running the bot through a different docker interface, skip this step.
 
 From inside that folder, run:
 
@@ -101,7 +118,7 @@ docker compose up -d
 The first run downloads the bot, which takes a moment. To check that it worked:
 
 ```sh
-docker compose logs bot
+docker compose logs porto-bot
 ```
 
 Look for a line starting with `Logged in as`. Your bot should now show as online in your server's member list.
@@ -113,10 +130,11 @@ Look for a line starting with `Logged in as`. Your bot should now show as online
 Commands must be registered with Discord once before they appear:
 
 ```sh
-docker compose run --rm bot node dist/register.js
+docker compose run --rm porto-bot node dist/register.js
 ```
 
-You should see `Registered 9 commands to guild ...`. In Discord, reload the app (**Ctrl+R**, or **Cmd+R** on a Mac), then type `/` in any channel to see them.
+You should see `Registered 9 commands to guild ...`. In Discord, reload the app (**Ctrl+R**, or **Cmd+R** on a Mac),
+then type `/` in any channel to see them.
 
 **Run this again after every update**, in case commands changed.
 
@@ -126,24 +144,26 @@ That's it. The bot is ready to use.
 
 ## Using the bot
 
-| Command | What it does |
-|---|---|
-| `/buy` | Record shares you bought: ticker, number of shares, price per share, and an optional past date |
-| `/sell` | Record shares you sold |
-| `/portfolio` | Show your holdings and recent transactions. Add a user to see someone else's |
-| `/position` | Show every transaction for one ticker |
-| `/amend` | Fix a transaction you entered wrong |
-| `/delete` | Remove a transaction |
-| `/clear` | Remove all of your transactions for one ticker |
-| `/reset` | Erase a member's entire history |
-| `/split` | Apply a stock split to everyone holding a ticker |
+| Command      | What it does                                                                                   |
+|--------------|------------------------------------------------------------------------------------------------|
+| `/buy`       | Record shares you bought: ticker, number of shares, price per share, and an optional past date |
+| `/sell`      | Record shares you sold                                                                         |
+| `/portfolio` | Show your holdings and recent transactions. Add a user to see someone else's                   |
+| `/position`  | Show every transaction for one ticker                                                          |
+| `/amend`     | Fix a transaction you entered wrong                                                            |
+| `/delete`    | Remove a transaction                                                                           |
+| `/clear`     | Remove all of your transactions for one ticker                                                 |
+| `/reset`     | Erase a member's entire history                                                                |
+| `/split`     | Apply a stock split to everyone holding a ticker                                               |
 
 A few things worth knowing:
 
-- Every transaction gets a short ID like `BS01` (buy), `SS01` (sell) or `SL01` (split), shown beside it. That is what you type into `/amend` and `/delete`.
+- Every transaction gets a short ID like `BS01` (buy), `SS01` (sell) or `SL01` (split), shown beside it. That is what
+  you type into `/amend` and `/delete`.
 - Mistakes are private. If you get something wrong, only you see the error message.
 - The bot never lets you sell more shares than you own, or edit your history into an impossible state.
-- `/reset` and `/split` are limited to members with the **Manage Server** permission. You can change who may use them in **Server Settings → Integrations**.
+- `/reset` and `/split` are limited to members with the **Manage Server** permission. You can change who may use them in
+  **Server Settings → Integrations**.
 
 ---
 
@@ -152,18 +172,20 @@ A few things worth knowing:
 ```sh
 docker compose pull
 docker compose up -d
-docker compose run --rm bot node dist/register.js
+docker compose run --rm porto-bot node dist/register.js
 ```
 
 Your data is kept, and any changes to how it is stored are applied automatically.
 
-To stay on a specific version instead of the newest, change the `image:` line in `compose.yaml` to a version from the [releases page](https://github.com/aer35/porto-bot/releases), for example:
+To stay on a specific version instead of the newest, change the `image:` line in `compose.yaml` to a version from
+the [releases page](https://github.com/aer35/porto-bot/releases), for example:
 
 ```yaml
     image: ghcr.io/aer35/porto-bot:1.0.0
 ```
 
-Releases marked **Pre-release** are test builds. Small fixes do not get their own release; they are listed under **Patches** inside the release they fix.
+Releases marked **Pre-release** are test builds. Small fixes do not get their own release; they are listed under *
+*Patches** inside the release they fix.
 
 ---
 
@@ -174,18 +196,18 @@ Everything lives in a single file called `porto.db`, kept in a Docker volume so 
 To make a backup, stop the bot first so nothing is written mid-copy:
 
 ```sh
-docker compose stop bot
-docker compose cp bot:/data/porto.db ./porto-backup.db
-docker compose start bot
+docker compose stop porto-bot
+docker compose cp porto-bot:/data/porto.db ./porto-backup.db
+docker compose start porto-bot
 ```
 
 To restore that backup:
 
 ```sh
-docker compose stop bot
-docker compose cp ./porto-backup.db bot:/data/porto.db
-docker compose run --rm --user root bot chown node:node /data/porto.db
-docker compose start bot
+docker compose stop porto-bot
+docker compose cp ./porto-backup.db porto-bot:/data/porto.db
+docker compose run --rm --user root porto-bot chown node:node /data/porto.db
+docker compose start porto-bot
 ```
 
 The third line gives the file back to the bot's user, which it needs in order to write to it.
@@ -194,17 +216,18 @@ The third line gives the file back to the bot's user, which it needs in order to
 
 ## If something goes wrong
 
-Start with `docker compose logs bot`, which usually says exactly what is wrong.
+Start with `docker compose logs porto-bot`, which usually says exactly what is wrong.
 
-| Problem | Fix |
-|---|---|
-| Log says a variable is missing | A line in `.env` is empty or misspelled, or `.env` is not in the same folder as `compose.yaml` |
-| Log says the token is invalid | The token is wrong. Reset it in the Developer Portal, update `.env`, and run `docker compose up -d` again |
-| No commands when you type `/` | Run Step 4 again, check the server ID in `.env`, then reload Discord |
-| "The application did not respond" | The bot is not running. Check `docker compose ps` and the logs |
-| Commands answered twice | You have two copies running with the same token. Stop one |
+| Problem                           | Fix                                                                                                       |
+|-----------------------------------|-----------------------------------------------------------------------------------------------------------|
+| Log says a variable is missing    | A line in `.env` is empty or misspelled, or `.env` is not in the same folder as `compose.yaml`            |
+| Log says the token is invalid     | The token is wrong. Reset it in the Developer Portal, update `.env`, and run `docker compose up -d` again |
+| No commands when you type `/`     | Run Step 4 again, check the server ID in `.env`, then reload Discord                                      |
+| "The application did not respond" | The bot is not running. Check `docker compose ps` and the logs                                            |
+| Commands answered twice           | You have two copies running with the same token. Stop one                                                 |
 
-The bot also writes a line to its log for every transaction, so `docker compose logs bot` is a record of everything that has been entered.
+The bot also writes a line to its log for every transaction, so `docker compose logs porto-bot` is a record of everything that
+has been entered.
 
 ---
 
@@ -218,4 +241,5 @@ cd porto-bot
 docker build -t porto-bot:local .
 ```
 
-Then set `image: porto-bot:local` in your `compose.yaml` and start it as usual. The repository also includes its own `compose.yaml` with a `dev` profile for working on the code.
+Then set `image: porto-bot:local` in your `compose.yaml` and start it as usual. The repository also includes its
+own `compose.yaml` with a `dev` profile for working on the code.

@@ -1,7 +1,7 @@
 import type { Tx } from './ledger.js';
 import { toDateString } from './validate.js';
 
-// One line per stored change, so `docker compose logs bot` is a record of every transaction and
+// One line per stored change, so `docker compose logs porto-bot` is a record of every transaction and
 // the first place to look when a number looks wrong. Plain text, not JSON: it is read by a person.
 export function logTx(event: string, userId: string, detail: string) {
   console.log(`${new Date().toISOString()} tx.${event} user=${userId} ${detail}`);

@@ -52,7 +52,7 @@ Design bias throughout: the bot tracks what users tell it. It does not validate 
 ### Behavior
 
 - **Errors are always ephemeral.** Only the user who made the mistake sees it.
-- **Every write is logged.** One line per stored change goes to stdout, so `docker compose logs bot` is a record of every transaction and the first place to look when a number is disputed.
+- **Every write is logged.** One line per stored change goes to stdout, so `docker compose logs porto-bot` is a record of every transaction and the first place to look when a number is disputed.
 - **Ticker validation** is a format check only (`^[A-Z.]{1,6}$`, uppercased). The bot does not know which tickers are real. Use Discord's native autocomplete on `/sell` and `/position` to suggest from the user's existing holdings.
 - **Dates** are stored as UTC. Display uses Discord's `<t:unix:D>` timestamp markup so each viewer sees their own local date. Ordering within a single day comes from the row's insert timestamp.
 - **Pagination** uses Discord message components. The 15-minute interaction token expiry is accepted — a stale page means the user re-runs the command.

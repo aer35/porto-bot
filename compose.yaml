@@ -1,14 +1,14 @@
 services:
-  bot:
+  porto-bot:
     image: ghcr.io/aer35/porto-bot:latest
     env_file: .env
     volumes:
       - data:/data
     restart: unless-stopped
 
-  # Development: `docker compose --profile dev up dev`. Name the service, or the production bot
-  # starts too and both answer every command. Uses a separate volume so dev data stays apart.
-  dev:
+  # Development: `docker compose --profile dev up porto-bot-dev`. Name the service, or the
+  # production bot starts too and both answer every command. Separate volume, so dev data stays apart.
+  porto-bot-dev:
     profiles: [dev]
     build:
       context: .

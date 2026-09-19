@@ -14,7 +14,7 @@
 
 - [ ] `npm test`
 - [ ] `docker compose up -d` and the bot logs in
-- [ ] `docker compose run --rm bot node dist/register.js`
+- [ ] `docker compose run --rm porto-bot node dist/register.js`
 - [ ] Ran the affected commands in a test server:
 
 ## Notes for the reviewer
