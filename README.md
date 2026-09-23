@@ -47,7 +47,7 @@ copy of the bot uses to log in.
     - Leave every switch under **Privileged Gateway Intents** turned off. This bot does not need them.
 5. Invite the bot to your server:
     - Click **OAuth2** in the sidebar, and find **OAuth2 URL Generator**.
-    - Under **Scopes**, tick **bot** and **applications.commands**. You will need both.zzzzzzzzzzzzzzzzzz
+    - Under **Scopes**, tick **bot** and **applications.commands**. You will need both.
     - Under **Bot Permissions**, tick **Send Messages** and **Embed Links**.
     - Copy the link that appears at the bottom, open it in a new browser tab, pick your server, and click **Authorize**.
 6. Get your server's ID:
