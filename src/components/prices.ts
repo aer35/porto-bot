@@ -1,4 +1,4 @@
-import { heldPositions, lastFetchedAt, savePrice } from '../queries/prices.js';
+import { heldPositions, lastFetchedAt, priceOf, savePrice } from '../queries/prices.js';
 import type { Position } from './ledger.js';
 import { toDateString } from './validate.js';
 
@@ -18,6 +18,12 @@ export function priceSymbol(p: Priced) {
   const strike = String(Math.round(p.strike! * 1000)).padStart(8, '0');
   return `${p.ticker}${yymmdd}${p.opt_right![0]}${strike}`;
 }
+
+// A position with its latest stored price, null until the nightly job has one.
+export type Holding = Position & { price?: number | null };
+
+export const withPrices = (positions: Position[]): Holding[] =>
+  positions.map((p) => ({ ...p, price: priceOf(priceSymbol(p)) }));
 
 // Every symbol some member holds, once each.
 export const heldSymbols = () => [...new Set(heldPositions().map(priceSymbol))];

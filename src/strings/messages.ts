@@ -1,5 +1,6 @@
 import { date, money, total } from '../components/format.js';
-import type { Position, Tx } from '../components/ledger.js';
+import type { Tx } from '../components/ledger.js';
+import type { Holding } from '../components/prices.js';
 import { formatQuantity, value, type Holdable } from '../components/units.js';
 import { toDateString } from '../components/validate.js';
 
@@ -122,7 +123,12 @@ export const messages = {
     holdings: '### Holdings',
     noHoldings: 'No holdings.',
     section: { STOCK: '**Stocks**', CRYPTO: '**Crypto**', OPTION: '**Options**' },
-    total: (cost: number) => `**Total cost basis** ${total(cost)}`,
+    // `current` is the value at current prices, with `unpriced` holdings counted at cost; left out
+    // when no holding has a price yet.
+    total: (cost: number, current: number | null, unpriced: number) =>
+      `**Total cost basis** ${total(cost)}` +
+      (current === null ? '' : ` · **value** ${total(current)}`) +
+      (current !== null && unpriced ? ` (${unpriced} at cost, no price yet)` : ''),
     recent: '### Recent transactions',
     noRecent: 'None yet.',
   },
@@ -180,8 +186,13 @@ export const messages = {
       `Applied a ${ratio.split_to}:${ratio.split_from} split to **${ticker}** for ${count} ${count === 1 ? 'member' : 'members'}.`,
   },
 
-  // One holding in /portfolio and /position: position, quantity, average cost, cost basis.
-  holdingLine: (p: Position) =>
+  // One holding in /portfolio and /position: position, quantity, average cost, cost basis, and
+  // once the nightly job has a price, that price, the current value and the unrealized P/L.
+  holdingLine: (p: Holding) =>
     `**${positionLabel(p)}** · ${formatQuantity(p.sec_type, p.shares)} ${quantityUnit[p.sec_type]} · ` +
-    `avg ${money(p.avgCost)} · cost ${total(value(p.sec_type, p.shares, p.avgCost))}`,
+    `avg ${money(p.avgCost)} · cost ${total(value(p.sec_type, p.shares, p.avgCost))}` +
+    (p.price != null
+      ? ` · price ${money(p.price)} · value ${total(value(p.sec_type, p.shares, p.price))} · ` +
+        `P/L ${signed(value(p.sec_type, p.shares, p.price - p.avgCost))}`
+      : ''),
 };
