@@ -17,6 +17,8 @@
 
 **One pull request per version.** Each version (V1, V2, …) is built on its own branch and opened as a single PR against `main` for manual review. Keep commits inside that PR small. **Never push to or merge into `main` unless explicitly told to.** Pushing the version branch is fine.
 
+**Issues are atomic.** One issue is one reviewable, mergeable unit of work. When several issues share groundwork or one only makes sense after another, file a parent issue and link the others under it as sub-issues (GitHub's native parent/sub-issue and blocked-by relations, not just a text mention) rather than writing one large issue that bundles them. A parent issue that turns out large enough to be its own reviewable unit gets its own PR regardless of which version milestone it's tagged with — it does not have to wait for the rest of that milestone.
+
 **Periodic ponytail reviews.** Run a ponytail review (`/ponytail-review` on a diff, `/ponytail-audit` on the repo) at the end of each major piece of work and before opening the PR, to catch over-engineering while it is still cheap to delete.
 
 ### Comments
