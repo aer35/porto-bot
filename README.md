@@ -225,7 +225,7 @@ What the options mean:
 
 | Field    | Meaning                                                                                 |
 |----------|-----------------------------------------------------------------------------------------|
-| `ticker` | Stock symbol, like `AAPL`. For crypto, the coin and currency, like `BTC-USD`            |
+| `ticker` | Symbol as on Yahoo Finance, like `AAPL`, but with a dot for share classes (`BRK.B`). For crypto, the coin and currency, like `BTC-USD`. Prices come from Yahoo, so a ticker it does not know gets no price |
 | `shares` | Number of shares, like `10.55`. Fractional shares are supported, up to 2 decimal places |
 | `amount` | Number of coins, like `0.00034`, up to 8 decimal places                                 |
 | `right`  | Options only: `Call` or `Put`                                                           |

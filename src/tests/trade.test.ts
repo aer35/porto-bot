@@ -122,3 +122,13 @@ test('an option can be sold after its expiry, closing a position bought before i
   assert.throws(() => tradeRow('u', 'BUY', 'option', typed(values), 'UTC', NOW), UserError);
   assert.throws(() => tradeRow('u', 'SELL', 'option', typed({ ...values, expiry: '2026-02-30' }), 'UTC', NOW), UserError);
 });
+
+test('every /buy and /sell ticker option names Yahoo Finance as the ticker source, within Discord\'s 100 characters', () => {
+  for (const side of ['BUY', 'SELL'] as const) {
+    for (const sub of trade(side).data.toJSON().options as { name: string; options: { name: string; description: string }[] }[]) {
+      const { description } = sub.options.find((o) => o.name === 'ticker')!;
+      assert.match(description, /Yahoo Finance/, `${side} ${sub.name}`);
+      assert.ok(description.length <= 100, description);
+    }
+  }
+});

@@ -70,13 +70,17 @@ export const messages = {
 
   options: {
     ticker: 'Ticker symbol, e.g. AAPL',
+    // /buy and /sell ticker captions name where prices come from (see Price data in CLAUDE.md), so a
+    // mistyped ticker is the member's to notice: the bot only checks a ticker's format. Yahoo writes
+    // share classes with a dash; the bot takes a dot and converts it.
+    stockTicker: 'Ticker as on Yahoo Finance, e.g. AAPL. Write share classes with a dot: BRK.B',
     shares: 'Number of shares, up to 2 decimals, e.g. 12.78',
     price: 'Price per share',
     anyTicker: 'Ticker symbol, e.g. AAPL or BTC-USD',
-    cryptoTicker: 'Coin and currency, e.g. BTC-USD. BTC alone means BTC-USD',
+    cryptoTicker: 'Coin and currency as on Yahoo Finance, e.g. BTC-USD. BTC alone means BTC-USD',
     amount: 'Number of coins, up to 8 decimals, e.g. 0.00034',
     coinPrice: 'Price per coin',
-    optionTicker: 'Ticker of the underlying stock, e.g. AAPL',
+    optionTicker: 'Underlying stock ticker as on Yahoo Finance, e.g. AAPL',
     right: 'Call or put',
     strike: 'Strike price per share, e.g. 150',
     expiry: 'Expiry date as YYYY-MM-DD. For a buy, today or later',
