@@ -7,7 +7,7 @@ import {
   type ButtonBuilder,
 } from 'discord.js';
 import { messages } from '../strings/messages.js';
-import type { Position } from './ledger.js';
+import type { Holding } from './prices.js';
 import { pageButtons } from './pageButtons.js';
 import { value, type Holdable } from './units.js';
 
@@ -38,18 +38,24 @@ function addTransactions(container: ContainerBuilder, lines: string[]) {
   });
 }
 
-const totalLine = (positions: Position[]) =>
-  messages.portfolio.total(positions.reduce((sum, p) => sum + value(p.sec_type, p.shares, p.avgCost), 0));
+function totalLine(holdings: Holding[]) {
+  const sum = (amount: (h: Holding) => number) => holdings.reduce((total, h) => total + amount(h), 0);
+  const cost = (h: Holding) => value(h.sec_type, h.shares, h.avgCost);
+  const unpriced = holdings.filter((h) => h.price == null).length;
+  const current =
+    unpriced === holdings.length ? null : sum((h) => (h.price == null ? cost(h) : value(h.sec_type, h.shares, h.price)));
+  return messages.portfolio.total(sum(cost), current, unpriced);
+}
 
 // One line per holding, then the total cost basis across all of them.
-const holdingsText = (positions: Position[], empty: string) =>
+const holdingsText = (positions: Holding[], empty: string) =>
   positions.length ? [...positions.map(messages.holdingLine), totalLine(positions)].join('\n') : empty;
 
 // /portfolio's holdings: a titled section per security type, in this order, each left out when
 // empty, then one total across every section. positions arrive sorted by ticker, and filtering
 // keeps that order within each section.
 const SECTIONS: Holdable[] = ['STOCK', 'CRYPTO', 'OPTION'];
-function sectionedHoldings(positions: Position[]) {
+function sectionedHoldings(positions: Holding[]) {
   if (!positions.length) return messages.portfolio.noHoldings;
   const sections = SECTIONS.map((type) => positions.filter((p) => p.sec_type === type))
     .filter((group) => group.length)
@@ -59,7 +65,7 @@ function sectionedHoldings(positions: Position[]) {
 
 // ponytail: no truncation. The text budget fits roughly 40 holdings alongside the recent list;
 // past that Discord rejects the reply. Paginate holdings if anyone gets there.
-export function portfolioView(userId: string, positions: Position[], recent: string[]) {
+export function portfolioView(userId: string, positions: Holding[], recent: string[]) {
   const container = new ContainerBuilder()
     .addTextDisplayComponents(
       text(messages.portfolio.title(userId)),
@@ -73,7 +79,7 @@ export function portfolioView(userId: string, positions: Position[], recent: str
 }
 
 // One page of a ticker's transactions (already cut to the page), under the holdings for that ticker.
-export function positionView(userId: string, ticker: string, held: Position[], lines: string[], page: number, pageCount: number) {
+export function positionView(userId: string, ticker: string, held: Holding[], lines: string[], page: number, pageCount: number) {
   const container = new ContainerBuilder()
     .addTextDisplayComponents(
       text(messages.position.title(userId, ticker)),

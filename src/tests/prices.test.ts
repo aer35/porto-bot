@@ -89,3 +89,14 @@ test('the price job is due once a day, after 17:00 in New York', () => {
   const yesterday = Date.parse('2026-03-09T22:00:00Z') / 1000;
   assert.equal(dueForPrices(at('2026-03-10T21:30:00Z'), yesterday), true);
 });
+
+test('withPrices attaches each holding its stored price, or null', async () => {
+  const { withPrices } = await import('../components/prices.js');
+  const { savePrice } = await import('../queries/prices.js');
+  savePrice('BRK-B', 500, 1);
+  const priced = withPrices([
+    { ...NOT_OPTION, sec_type: 'STOCK', ticker: 'BRK.B', shares: 100, avgCost: 400 },
+    { ...NOT_OPTION, sec_type: 'STOCK', ticker: 'ZZZZ', shares: 100, avgCost: 1 },
+  ]);
+  assert.deepEqual(priced.map((p) => p.price), [500, null]);
+});

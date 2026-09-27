@@ -75,3 +75,12 @@ test('portfolio groups holdings into stock, crypto and option sections, hiding e
   assert.match(stocksOnly, /\*\*Stocks\*\*/);
   assert.doesNotMatch(stocksOnly, /Crypto|Options/);
 });
+
+test('the total adds current value next to cost, counting holdings without a price at cost', () => {
+  const priced = texts(portfolioView('42', [{ ...aapl, price: 12 }, { ...btc, price: 70_000 }], [])).join('\n');
+  assert.match(priced, /\*\*Total cost basis\*\* \$30,125\.00 · \*\*value\*\* \$35,150\.00$/m);
+  const partly = texts(portfolioView('42', [{ ...aapl, price: 12 }, btc], [])).join('\n');
+  assert.match(partly, /\*\*Total cost basis\*\* \$30,125\.00 · \*\*value\*\* \$30,150\.00 \(1 at cost, no price yet\)$/m);
+  const none = texts(portfolioView('42', [aapl], [])).join('\n');
+  assert.match(none, /\*\*Total cost basis\*\* \$125\.00$/m);
+});

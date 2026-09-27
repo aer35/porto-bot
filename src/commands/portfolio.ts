@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, type ChatInputCommandInteraction } from 'discord.js';
 import { historyLines } from '../components/historyLines.js';
+import { withPrices } from '../components/prices.js';
 import { portfolioView } from '../components/views.js';
 import { holdingsOf, recentHistory } from '../queries/holdings.js';
 import { messages } from '../strings/messages.js';
@@ -13,5 +14,6 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   const userId = (interaction.options.getUser('user') ?? interaction.user).id;
-  await interaction.reply(portfolioView(userId, holdingsOf(userId), historyLines(recentHistory(userId, RECENT_COUNT))));
+  const holdings = withPrices(holdingsOf(userId));
+  await interaction.reply(portfolioView(userId, holdings, historyLines(recentHistory(userId, RECENT_COUNT))));
 }

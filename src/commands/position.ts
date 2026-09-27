@@ -5,6 +5,7 @@ import {
   type ChatInputCommandInteraction,
 } from 'discord.js';
 import { historyLines } from '../components/historyLines.js';
+import { withPrices } from '../components/prices.js';
 import { tickerAutocomplete } from '../components/tickerAutocomplete.js';
 import { holdingsOf, tickerHistory } from '../queries/holdings.js';
 import { UserError } from '../components/userError.js';
@@ -26,7 +27,7 @@ export const data = new SlashCommandBuilder()
 function render(userId: string, ticker: string, requested: number) {
   const { rows, page, pageCount } = tickerHistory(userId, ticker, PAGE_SIZE, requested);
   if (!pageCount) throw new UserError(messages.position.none(userId, ticker));
-  const held = holdingsOf(userId).filter((p) => p.ticker === ticker);
+  const held = withPrices(holdingsOf(userId).filter((p) => p.ticker === ticker));
   return positionView(userId, ticker, held, historyLines(rows), page, pageCount);
 }
 
