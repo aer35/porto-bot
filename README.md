@@ -305,6 +305,10 @@ docker compose cp porto-bot:/data/porto.db ./porto-backup.db
 docker compose start porto-bot
 ```
 
+The database also holds the latest price of everything members own. The bot fetches these from Yahoo Finance once
+every evening, after 17:00 New York time, so it needs to reach `query1.finance.yahoo.com` over the internet. To fetch
+them right away instead of waiting, run `docker compose run --rm porto-bot node dist/fetchPrices.js`.
+
 The bot also backs up the database by itself whenever an update changes its layout, just before applying the change. These copies sit next to `porto.db` in the volume, named like `porto.db.v2-backup-2026-09-26T13-45-00.db`, and are never deleted automatically. Remove old ones when you no longer need them.
 
 To restore that backup:
