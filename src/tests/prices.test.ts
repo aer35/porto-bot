@@ -93,10 +93,19 @@ test('the price job is due once a day, after 17:00 in New York', () => {
 test('withPrices attaches each holding its stored price, or null', async () => {
   const { withPrices } = await import('../components/prices.js');
   const { savePrice } = await import('../queries/prices.js');
-  savePrice('BRK-B', 500, 1);
+  savePrice('BRK-B', 500, Math.floor(Date.now() / 1000));
   const priced = withPrices([
     { ...NOT_OPTION, sec_type: 'STOCK', ticker: 'BRK.B', shares: 100, avgCost: 400 },
     { ...NOT_OPTION, sec_type: 'STOCK', ticker: 'ZZZZ', shares: 100, avgCost: 1 },
   ]);
   assert.deepEqual(priced.map((p) => p.price), [500, null]);
+});
+
+test('a price older than 2 days counts as no price, so a stale one is never shown as current', async () => {
+  const { savePrice } = await import('../queries/prices.js');
+  const now = Math.floor(Date.now() / 1000);
+  savePrice('FRESH', 10, now - 36 * 3600);
+  savePrice('STALE', 10, now - 49 * 3600);
+  assert.equal(priceOf('FRESH'), 10);
+  assert.equal(priceOf('STALE'), null);
 });
