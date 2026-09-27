@@ -1,6 +1,7 @@
 import { ActivityType, Client, Events, GatewayIntentBits } from 'discord.js';
 import { config } from './config.js';
 import { loadCommands } from './loadCommands.js';
+import { schedulePrices } from './components/prices.js';
 import { rebuildAll } from './components/userLedger.js';
 import { route } from './router.js';
 import { version } from './version.js';
@@ -15,7 +16,10 @@ const client = new Client({
   presence: { activities: [{ type: ActivityType.Custom, name: 'version', state: `v${version}` }] },
 });
 
-client.once(Events.ClientReady, (ready) => console.log(`Logged in as ${ready.user.tag}, v${version}`));
+client.once(Events.ClientReady, (ready) => {
+  console.log(`Logged in as ${ready.user.tag}, v${version}`);
+  schedulePrices();
+});
 client.on(Events.InteractionCreate, route(commands));
 
 // Docker stops containers with SIGTERM, which Node ignores as PID 1. Database writes are
