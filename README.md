@@ -147,17 +147,17 @@ That's it. The bot is ready to use.
 
 ## Using the bot
 
-| Command | What it does | Required | Optional |
-|---|---|---|---|
-| `/buy` | Record shares you bought | `ticker`, `shares`, `price` | `date` |
-| `/sell` | Record shares you sold | `ticker`, `shares`, `price` | `date` |
-| `/portfolio` | Show holdings and recent transactions | — | `user` |
-| `/position` | Show every transaction for one ticker | `ticker` | `user` |
-| `/amend` | Fix a transaction you entered wrong | `id` | — |
-| `/delete` | Remove a transaction | `id` | — |
-| `/clear` | Remove all of your transactions for one ticker | `ticker` | — |
-| `/reset` | Erase a member's entire history | `user` | — |
-| `/split` | Apply a stock split to everyone holding a ticker | `ticker`, `ratio` | — |
+| Command               | What it does                                     | Required                    | Optional |
+|-----------------------|--------------------------------------------------|-----------------------------|----------|
+| `/buy`                | Record shares you bought                         | `ticker`, `shares`, `price` | `date`   |
+| `/sell`               | Record shares you sold                           | `ticker`, `shares`, `price` | `date`   |
+| `/portfolio`          | Show holdings and recent transactions            | —                           | `user`   |
+| `/position`           | Show every transaction for one ticker            | `ticker`                    | `user`   |
+| `/amend`              | Fix a transaction you entered wrong              | `id`                        | —        |
+| `/delete`             | Remove a transaction                             | `id`                        | —        |
+| `/clear`              | Remove all of your transactions for one ticker   | `ticker`                    | —        |
+| `/reset` (Admin Only) | Erase a member's entire history                  | `user`                      | —        |
+| `/split` (Admin Only) | Apply a stock split to everyone holding a ticker | `ticker`, `ratio`           | —        |
 
 What the options mean: `ticker` is the symbol, like `AAPL`. `shares` is a whole number. `price` is the price per share. `date` is `YYYY-MM-DD` and cannot be in the future; leave it out for today. `user` picks whose transactions to show, and defaults to you. `id` is a transaction ID such as `BS01`. `ratio` is the split, written as new:old, such as `3:2` or `1:10`.
 
