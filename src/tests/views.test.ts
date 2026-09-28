@@ -123,7 +123,7 @@ test('position shows its holdings and a page of transactions, with page buttons 
 
 test('a priced holding adds price, value and P/L to its row, and the totals add value, counting unpriced holdings at cost', () => {
   const priced = texts(portfolioView('42', 'STOCK', [{ ...aapl, price: 12 }, { ...btc, price: 70_000 }], 0)).join('\n');
-  assert.match(priced, /-# Ticker · Shares · Avg cost · Cost basis · Price · Value · P\/L\n\*\*AAPL\*\* · 12\.5 · \$10\.00 · \$125\.00 · \$12\.00 · \$150\.00 · \+\$25\.00/);
+  assert.match(priced, /-# Ticker · Shares · Avg cost · Cost basis · Price · Value · P\/L\n\*\*AAPL\*\* · 12\.5 · \$10\.00 · \$125\.00 · \$12\.00 · \$150\.00 · 🟢 \+\$25\.00/);
   assert.match(priced, /\*\*Cost basis\*\* \$125\.00 · \*\*Value\*\* \$150\.00 · \*\*Total, all holdings\*\* \$30,125\.00 cost, \$35,150\.00 value$/m);
 
   const partly = texts(portfolioView('42', 'STOCK', [{ ...aapl, price: 12 }, msft, btc], 0)).join('\n');
@@ -132,6 +132,6 @@ test('a priced holding adds price, value and P/L to its row, and the totals add 
   assert.match(partly, /\$30,250\.00 cost, \$30,275\.00 value \(2 at cost, no price yet\)$/m);
 
   const position = texts(positionView('42', 'AAPL', [{ ...aapl, price: 12 }], ['tx'], 0, 1)).join('\n');
-  assert.match(position, /price \$12\.00 · value \$150\.00 · P\/L \+\$25\.00/);
+  assert.match(position, /price \$12\.00 · value \$150\.00 · P\/L 🟢 \+\$25\.00/);
   assert.match(position, /\*\*Total cost basis\*\* \$125\.00 · \*\*value\*\* \$150\.00$/m);
 });
