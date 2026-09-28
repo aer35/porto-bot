@@ -6,12 +6,13 @@ import { shortDate, toDateString } from '../components/validate.js';
 
 // Every transaction renders the same way, in two lines:
 //
-//   **ACTION** QUANTITY × UNIT of **TICKER** @ UNIT_PRICE
+//   TYPE_MARK **ACTION** QUANTITY × UNIT of **TICKER** @ UNIT_PRICE
 //   `REF` · total TOTAL · DATE
 //
 // Rows that have no price, like splits, put their detail on the first line and drop the total. An
-// option names its contract after the ticker: "**BUY** 2 × CALL of **AAPL** $150.00 01/16/26 @ $3.20".
-// A sell adds "P/L +$12.34" before the date. In /portfolio and /position each transaction is its
+// option names its contract after the ticker: "🟥 **BUY** 2 × CALL of **AAPL** $150.00 01/16/26 @ $3.20".
+// Crypto shows its total on the first line and its price per coin on the second. A sell adds
+// "P/L 🟢 +$12.34" before the date. In /portfolio and /position each transaction is its
 // own text display, with a Separator component between entries (src/components/views.ts); elsewhere
 // it is a plain message or embed. Holdings are one line each, see holdingLine.
 // Quantities are stored scaled (src/components/units.ts), so formatQuantity and value do the unscaling.
@@ -40,16 +41,25 @@ const expired = (p: Contract) =>
 // A holding's name in bold, then the expired mark if any.
 const holdingLabel = (p: Holding) => `**${positionLabel(p)}**${expired(p)}`;
 
+// Discord cannot color message text, so each transaction starts with a square in its type's tab
+// colour (views.ts ACCENT). A split only ever applies to stock, so it takes the stock colour.
+const typeMark = { STOCK: '🟩', CRYPTO: '🟦', OPTION: '🟥', SPLIT: '🟩' };
+
 const action = (tx: Tx, counts?: [number, number]) =>
-  tx.sec_type === 'SPLIT'
+  `${typeMark[tx.sec_type]} ` +
+  (tx.sec_type === 'SPLIT'
     ? `**SPLIT** ${tx.split_to}:${tx.split_from} of **${tx.ticker}**` +
       (counts ? ` — ${formatQuantity('STOCK', counts[0])} → ${formatQuantity('STOCK', counts[1])} shares` : '')
     : `**${tx.side}** ${formatQuantity(tx.sec_type, tx.shares!)} × ${unit(tx)} of **${tx.ticker}**${contract(tx)} ` +
       // Crypto is bought for a total ("0.5 BTC for $30,000"); the price per coin goes on the next line.
-      (tx.sec_type === 'CRYPTO' ? `for ${money(value(tx.sec_type, tx.shares!, tx.price!))}` : `@ ${money(tx.price!)}`);
+      (tx.sec_type === 'CRYPTO' ? `for ${money(value(tx.sec_type, tx.shares!, tx.price!))}` : `@ ${money(tx.price!)}`));
 
-// Realized P/L with its sign, e.g. "+$150.00" or "-$0.50".
-const signed = (n: number) => (n < 0 ? '-' : '+') + money(Math.abs(n));
+// P/L with a coloured dot and its sign, e.g. "🟢 +$150.00", "🔴 -$0.50", or "⚪ $0.00" when it
+// rounds to nothing. Compared in cents, so a P/L of a fraction of a cent never shows "🔴 -$0.00".
+function signed(n: number) {
+  const cents = Math.round(n * 100);
+  return cents > 0 ? `🟢 +${money(n)}` : cents < 0 ? `🔴 -${money(-n)}` : `⚪ ${money(0)}`;
+}
 
 // "(2 at cost, no price yet)" after a value that counts holdings without a price at their cost.
 const atCost = (t: Totals) => (t.unpriced ? ` (${t.unpriced} at cost, no price yet)` : '');

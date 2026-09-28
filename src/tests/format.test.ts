@@ -21,7 +21,7 @@ test('every transaction renders as an action line then a metadata line', () => {
   };
   assert.equal(
     messages.txLine(tx),
-    '**BUY** 12.78 × shares of **AAPL** @ $150.00\n`BSS07` · total $1,917.00 · <t:1767268800:D>',
+    '🟩 **BUY** 12.78 × shares of **AAPL** @ $150.00\n`BSS07` · total $1,917.00 · <t:1767268800:D>',
   );
 });
 
@@ -45,7 +45,7 @@ test('historyLines shows share counts before and after a split', () => {
   ];
   const result = replay(rows);
   assert.ok(result.ok);
-  assert.match(historyLines(result.history)[2], /\*\*SPLIT\*\* 3:2 of \*\*AAPL\*\* — 5 → 7.5 shares\n`XX01` · <t:3:D>/);
+  assert.match(historyLines(result.history)[2], /🟩 \*\*SPLIT\*\* 3:2 of \*\*AAPL\*\* — 5 → 7.5 shares\n`XX01` · <t:3:D>/);
 });
 
 test('a crypto transaction shows coins, truncated to 3 decimals, what they cost in total, and the price per coin', () => {
@@ -56,7 +56,7 @@ test('a crypto transaction shows coins, truncated to 3 decimals, what they cost 
   };
   assert.equal(
     messages.txLine(tx),
-    '**BUY** 1.234 × coins of **BTC-USD** for $123,456.79\n`BCC01` · $100,000.00 per coin · <t:1767268800:D>',
+    '🟦 **BUY** 1.234 × coins of **BTC-USD** for $123,456.79\n`BCC01` · $100,000.00 per coin · <t:1767268800:D>',
   );
 });
 
@@ -72,7 +72,7 @@ test('an option transaction names the contract, and its total is 100 × contract
   };
   assert.equal(
     messages.txLine(tx),
-    '**BUY** 2 × CALL of **AAPL** $150.00 01/16/26 @ $3.20\n`BOC01` · total $640.00 · <t:1767268800:D>',
+    '🟥 **BUY** 2 × CALL of **AAPL** $150.00 01/16/26 @ $3.20\n`BOC01` · total $640.00 · <t:1767268800:D>',
   );
 });
 
@@ -87,14 +87,16 @@ test('an option held past its expiry stays in holdings, marked expired', () => {
   assert.equal(messages.holdingRow(put), '**AAPL PUT $150.00 01/16/26** (expired) · 2 · $3.20 · $640.00');
 });
 
-test('a sell shows its realized P/L when known, signed', () => {
+test('a sell shows its realized P/L when known, signed, after a green or red dot (white at break-even)', () => {
   const tx = {
     id: 1, ref: 'SSS02', user_id: 'u', sec_type: 'STOCK' as const, side: 'SELL' as const, ticker: 'AAPL',
     shares: 5000, price: 180, trade_date: 1767268800, created_at: 0, split_from: null, split_to: null,
     opt_right: null, strike: null, expiry: null,
   };
-  assert.equal(messages.txLine(tx, { realized: 150 }).split('\n')[1], '`SSS02` · total $900.00 · P/L +$150.00 · <t:1767268800:D>');
-  assert.equal(messages.txLine(tx, { realized: -0.5 }).split('\n')[1], '`SSS02` · total $900.00 · P/L -$0.50 · <t:1767268800:D>');
+  assert.equal(messages.txLine(tx, { realized: 150 }).split('\n')[1], '`SSS02` · total $900.00 · P/L 🟢 +$150.00 · <t:1767268800:D>');
+  assert.equal(messages.txLine(tx, { realized: -0.5 }).split('\n')[1], '`SSS02` · total $900.00 · P/L 🔴 -$0.50 · <t:1767268800:D>');
+  assert.equal(messages.txLine(tx, { realized: 0 }).split('\n')[1], '`SSS02` · total $900.00 · P/L ⚪ $0.00 · <t:1767268800:D>');
+  assert.equal(messages.txLine(tx, { realized: -0.004 }).split('\n')[1], '`SSS02` · total $900.00 · P/L ⚪ $0.00 · <t:1767268800:D>');
   assert.equal(messages.txLine(tx).split('\n')[1], '`SSS02` · total $900.00 · <t:1767268800:D>');
 });
 
