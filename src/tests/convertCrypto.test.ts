@@ -19,15 +19,15 @@ const stock = (user_id: string, side: 'BUY' | 'SELL', shares: number, ticker = '
 });
 
 test('converts V1 stock rows for a coin into crypto rows at the crypto scale, for every user', () => {
-  commitChange('a', { insert: stock('a', 'BUY', 300) }); // 3 "shares" of BTC, entered as stock in V1
-  commitChange('a', { insert: stock('a', 'SELL', 100) });
-  commitChange('b', { insert: stock('b', 'BUY', 100) });
-  commitChange('a', { insert: stock('a', 'BUY', 100, 'AAPL') });
+  commitChange('a', { insert: stock('a', 'BUY', 3000) }); // 3 "shares" of BTC, entered as stock in V1
+  commitChange('a', { insert: stock('a', 'SELL', 1000) });
+  commitChange('b', { insert: stock('b', 'BUY', 1000) });
+  commitChange('a', { insert: stock('a', 'BUY', 1000, 'AAPL') });
 
   assert.equal(convertToCrypto('BTC', 'BTC-USD'), 3);
 
   assert.deepEqual(holdingsOf('a'), [
-    { sec_type: 'STOCK', ticker: 'AAPL', shares: 100, avgCost: 50_000, ...NOT_OPTION },
+    { sec_type: 'STOCK', ticker: 'AAPL', shares: 1000, avgCost: 50_000, ...NOT_OPTION },
     { sec_type: 'CRYPTO', ticker: 'BTC-USD', shares: 200_000_000, avgCost: 50_000, ...NOT_OPTION },
   ]);
   assert.deepEqual(holdingsOf('b'), [{ sec_type: 'CRYPTO', ticker: 'BTC-USD', shares: 100_000_000, avgCost: 50_000, ...NOT_OPTION }]);
@@ -36,7 +36,7 @@ test('converts V1 stock rows for a coin into crypto rows at the crypto scale, fo
 });
 
 test('refuses a ticker with split rows, and changes nothing', () => {
-  commitChange('c', { insert: stock('c', 'BUY', 100, 'ETH') });
+  commitChange('c', { insert: stock('c', 'BUY', 1000, 'ETH') });
   commitChange('c', {
     insert: { user_id: 'c', sec_type: 'SPLIT', side: null, ticker: 'ETH', shares: null, price: null, trade_date: 86_400, split_from: 1, split_to: 2,
       opt_right: null, strike: null, expiry: null },

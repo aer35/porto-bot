@@ -27,14 +27,14 @@ test('/buy and /sell each have a stock subcommand', () => {
   }
 });
 
-test('a stock trade reads into a STOCK row with shares in hundredths', () => {
-  const row = tradeRow('u', 'BUY', 'stock', typed({ ticker: ' aapl ', shares: 12.78, price: 150, date: '2026-03-02' }), 'UTC', NOW);
+test('a stock trade reads into a STOCK row with shares in thousandths', () => {
+  const row = tradeRow('u', 'BUY', 'stock', typed({ ticker: ' aapl ', shares: 12.785, price: 150, date: '2026-03-02' }), 'UTC', NOW);
   assert.deepEqual(row, {
     user_id: 'u',
     sec_type: 'STOCK',
     side: 'BUY',
     ticker: 'AAPL',
-    shares: 1278,
+    shares: 12_785,
     price: 150,
     trade_date: Date.parse('2026-03-02T12:00:00Z') / 1000,
     split_from: null,
@@ -53,7 +53,7 @@ test('a stock trade without a date is dated today', () => {
 test('invalid stock input is a UserError', () => {
   const base = { ticker: 'AAPL', shares: 1, price: 1 };
   const bads: Record<string, string | number>[] = [
-    { ticker: 'TOOLONGX' }, { shares: 0.001 }, { price: 0 }, { price: 1.123456789 }, { date: '2099-01-01' },
+    { ticker: 'TOOLONGX' }, { shares: 0.0001 }, { shares: 1.2345 }, { price: 0 }, { price: 1.123456789 }, { date: '2099-01-01' },
   ];
   for (const bad of bads) {
     assert.throws(() => tradeRow('u', 'BUY', 'stock', typed({ ...base, ...bad }), 'UTC', NOW), UserError);
@@ -86,7 +86,7 @@ test('a crypto trade takes what was paid in total and stores the price per coin'
 
 test('invalid crypto input is a UserError', () => {
   const base = { ticker: 'BTC-USD', amount: 1, total: 1 };
-  const bads: Record<string, string | number>[] = [{ ticker: 'BTC.USD' }, { amount: 0.000000001 }, { amount: 100_000_000 }, { total: 0 }, { total: 20_000_000 }];
+  const bads: Record<string, string | number>[] = [{ ticker: 'BTC.USD' }, { amount: 0.0000001 }, { amount: 0.00000001 }, { amount: 100_000_000 }, { total: 0 }, { total: 20_000_000 }];
   for (const bad of bads) {
     assert.throws(() => tradeRow('u', 'BUY', 'crypto', typed({ ...base, ...bad }), 'UTC', NOW), UserError);
   }

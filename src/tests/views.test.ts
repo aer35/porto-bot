@@ -5,7 +5,7 @@ import type { Position } from '../components/ledger.js';
 import { portfolioView, positionView, transactionsView } from '../components/views.js';
 
 const NOT_OPTION = { opt_right: null, strike: null, expiry: null };
-const aapl: Position = { ...NOT_OPTION, sec_type: 'STOCK', ticker: 'AAPL', shares: 1250, avgCost: 10 };
+const aapl: Position = { ...NOT_OPTION, sec_type: 'STOCK', ticker: 'AAPL', shares: 12_500, avgCost: 10 };
 const btc: Position = { ...NOT_OPTION, sec_type: 'CRYPTO', ticker: 'BTC-USD', shares: 50_000_000, avgCost: 60_000 };
 
 // The container's children as [type, text] pairs, text only for text displays.

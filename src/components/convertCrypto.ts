@@ -5,7 +5,7 @@ import { units } from './units.js';
 import { syncUser } from './userLedger.js';
 
 // One-time fix for installs that ran V1, which had no crypto: members recorded coins with /buy as
-// if they were stock, in hundredths. This turns every such row, for every member, into a CRYPTO
+// if they were stock (in hundredths then, thousandths since 2026092800). This turns every such row, for every member, into a CRYPTO
 // row under `to` at the crypto scale, with a crypto reference. Run by the host (src/convertCrypto.ts).
 // Returns how many rows changed.
 //

@@ -16,7 +16,7 @@ test('every dollar amount is shown in cents, per-unit prices and averages includ
 test('every transaction renders as an action line then a metadata line', () => {
   const tx = {
     id: 1, ref: 'BSS07', user_id: 'u', sec_type: 'STOCK' as const, side: 'BUY' as const, ticker: 'AAPL',
-    shares: 1278, price: 150, trade_date: 1767268800, created_at: 0, split_from: null, split_to: null,
+    shares: 12_780, price: 150, trade_date: 1767268800, created_at: 0, split_from: null, split_to: null,
     opt_right: null, strike: null, expiry: null,
   };
   assert.equal(
@@ -27,7 +27,7 @@ test('every transaction renders as an action line then a metadata line', () => {
 
 test('a holdings line shows decimal shares and a cost basis in dollars', () => {
   assert.equal(
-    messages.holdingLine({ sec_type: 'STOCK', ticker: 'AAPL', shares: 1250, avgCost: 10, opt_right: null, strike: null, expiry: null }),
+    messages.holdingLine({ sec_type: 'STOCK', ticker: 'AAPL', shares: 12_500, avgCost: 10, opt_right: null, strike: null, expiry: null }),
     '**AAPL** · 12.5 shares · avg $10.00 · cost $125.00',
   );
 });
@@ -39,8 +39,8 @@ test('historyLines shows share counts before and after a split', () => {
     opt_right: null, strike: null, expiry: null,
   };
   const rows: Tx[] = [
-    { ...base, id: 1, sec_type: 'STOCK', side: 'BUY', ticker: 'AAPL', shares: 500, price: 10, trade_date: 1 },
-    { ...base, id: 2, sec_type: 'STOCK', side: 'BUY', ticker: 'MSFT', shares: 100, price: 10, trade_date: 2 },
+    { ...base, id: 1, sec_type: 'STOCK', side: 'BUY', ticker: 'AAPL', shares: 5000, price: 10, trade_date: 1 },
+    { ...base, id: 2, sec_type: 'STOCK', side: 'BUY', ticker: 'MSFT', shares: 1000, price: 10, trade_date: 2 },
     { ...base, id: 3, sec_type: 'SPLIT', ticker: 'AAPL', split_to: 3, split_from: 2, trade_date: 3 },
   ];
   const result = replay(rows);
@@ -90,7 +90,7 @@ test('an option held past its expiry stays in holdings, marked expired', () => {
 test('a sell shows its realized P/L when known, signed', () => {
   const tx = {
     id: 1, ref: 'SSS02', user_id: 'u', sec_type: 'STOCK' as const, side: 'SELL' as const, ticker: 'AAPL',
-    shares: 500, price: 180, trade_date: 1767268800, created_at: 0, split_from: null, split_to: null,
+    shares: 5000, price: 180, trade_date: 1767268800, created_at: 0, split_from: null, split_to: null,
     opt_right: null, strike: null, expiry: null,
   };
   assert.equal(messages.txLine(tx, { realized: 150 }).split('\n')[1], '`SSS02` · total $900.00 · P/L +$150.00 · <t:1767268800:D>');
@@ -99,7 +99,7 @@ test('a sell shows its realized P/L when known, signed', () => {
 });
 
 test('a priced holdings line adds the current price, current value and unrealized P/L', () => {
-  const aapl = { sec_type: 'STOCK' as const, ticker: 'AAPL', shares: 1250, avgCost: 10, opt_right: null, strike: null, expiry: null };
+  const aapl = { sec_type: 'STOCK' as const, ticker: 'AAPL', shares: 12_500, avgCost: 10, opt_right: null, strike: null, expiry: null };
   assert.equal(
     messages.holdingLine({ ...aapl, price: 12 }),
     '**AAPL** · 12.5 shares · avg $10.00 · cost $125.00 · price $12.00 · value $150.00 · P/L +$25.00',

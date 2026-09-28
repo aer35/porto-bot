@@ -89,11 +89,11 @@ export const messages = {
     // mistyped ticker is the member's to notice: the bot only checks a ticker's format. Yahoo writes
     // share classes with a dash; the bot takes a dot and converts it.
     stockTicker: 'Ticker as on Yahoo Finance, e.g. AAPL. Write share classes with a dot: BRK.B',
-    shares: 'Number of shares, up to 2 decimals, e.g. 12.78',
+    shares: 'Number of shares, up to 3 decimals, e.g. 12.785',
     price: 'Price per share',
     anyTicker: 'Ticker symbol, e.g. AAPL or BTC-USD',
     cryptoTicker: 'Coin and currency as on Yahoo Finance, e.g. BTC-USD. BTC alone means BTC-USD',
-    amount: 'Number of coins, up to 8 decimals, e.g. 0.00034',
+    amount: 'Number of coins, up to 6 decimals, e.g. 0.00034',
     totalPaid: 'What you paid in total, in USD, e.g. 100',
     totalReceived: 'What you received in total, in USD, e.g. 100. Can be 0',
     optionTicker: 'Underlying stock ticker as on Yahoo Finance, e.g. AAPL',
@@ -115,9 +115,9 @@ export const messages = {
   invalidExpiry: 'Expiry must be `MM/DD/YY`, or `MM/DD` for this year, like `12/24`. For a buy, today or later.',
   invalidContracts: 'Contracts must be a whole number, 1 or more.',
   invalidRef: 'Transaction IDs look like `BSS01` (buy), `SSS01` (sell) or `XSS01` (split).',
-  invalidShares: 'Shares must be above 0 with at most 2 decimals, like `12.78`.',
+  invalidShares: 'Shares must be above 0 with at most 3 decimals, like `12.785`.',
   invalidCryptoTicker: 'Crypto tickers are a coin and a currency, like `BTC-USD`, or just the coin, like `BTC`.',
-  invalidAmount: 'Amount must be above 0 and below 90,000,000, with at most 8 decimals, like `0.00034`.',
+  invalidAmount: 'Amount must be above 0 and below 90,000,000, with at most 6 decimals, like `0.00034`.',
   invalidPrice: 'Price must be above 0 (a sale can be 0) and at most $10,000,000, with at most 8 decimals, like `150.25`.',
   invalidDate: 'Dates must be `YYYY-MM-DD` and not in the future.',
   oversold: (tx: Tx) =>

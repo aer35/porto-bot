@@ -82,8 +82,8 @@ test('option trades get BOC/BOP/SOC/SOP references by side and right', () => {
 });
 
 test('realizedOf gives a stored sell its P/L, and anything else null', () => {
-  const bought = commitChange('p', { insert: { ...trade('p', 'BUY', 1000), price: 10 } })!;
-  const sold = commitChange('p', { insert: { ...trade('p', 'SELL', 400), price: 12.5 } })!;
+  const bought = commitChange('p', { insert: { ...trade('p', 'BUY', 10_000), price: 10 } })!;
+  const sold = commitChange('p', { insert: { ...trade('p', 'SELL', 4000), price: 12.5 } })!;
   assert.equal(realizedOf(sold.id), 10); // 4 shares × $2.50
   assert.equal(realizedOf(bought.id), null);
 });

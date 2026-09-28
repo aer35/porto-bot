@@ -62,17 +62,17 @@ test('a position sold to zero has no holdings row', () => {
 
 test('history carries split counts and realized P/L, newest first, and pages by ticker', () => {
   const u = 'h4';
-  commitChange(u, { insert: tx(u, { shares: 500, price: 30 }) });
+  commitChange(u, { insert: tx(u, { shares: 5000, price: 30 }) });
   commitChange(u, { insert: split(u, 3, 2, 2) });
-  commitChange(u, { insert: tx(u, { side: 'SELL', shares: 300, price: 30, trade_date: 3 * DAY }) });
+  commitChange(u, { insert: tx(u, { side: 'SELL', shares: 3000, price: 30, trade_date: 3 * DAY }) });
   commitChange(u, { insert: tx(u, { ticker: 'MSFT', trade_date: 4 * DAY }) });
 
   assert.deepEqual(
     historyPage(u, null, 3, 0).rows.map(({ tx, before, after, realized }) => [tx.ticker, tx.sec_type, before, after, realized]),
     [
       ['MSFT', 'STOCK', 0, 1000, null],
-      ['AAPL', 'STOCK', 750, 450, 30], // 3 shares × ($30 − $20 average after the split)
-      ['AAPL', 'SPLIT', 500, 750, null],
+      ['AAPL', 'STOCK', 7500, 4500, 30], // 3 shares × ($30 − $20 average after the split)
+      ['AAPL', 'SPLIT', 5000, 7500, null],
     ],
   );
   const first = historyPage(u, 'AAPL', 2, 0);

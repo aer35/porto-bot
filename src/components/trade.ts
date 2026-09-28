@@ -116,7 +116,7 @@ const types: Record<string, SecurityType> = {
     options: (sub, side) =>
       priceOption(
         tickerOption(sub, side, 'STOCK', messages.options.stockTicker).addNumberOption((o) =>
-          o.setName('shares').setDescription(messages.options.shares).setRequired(true).setMinValue(0.01),
+          o.setName('shares').setDescription(messages.options.shares).setRequired(true).setMinValue(10 ** -units.STOCK.decimals),
         ),
         'price',
         messages.options.price,
@@ -135,7 +135,7 @@ const types: Record<string, SecurityType> = {
     options: (sub, side) =>
       priceOption(
         tickerOption(sub, side, 'CRYPTO', messages.options.cryptoTicker).addNumberOption((o) =>
-          o.setName('amount').setDescription(messages.options.amount).setRequired(true).setMinValue(1 / units.CRYPTO.scale),
+          o.setName('amount').setDescription(messages.options.amount).setRequired(true).setMinValue(10 ** -units.CRYPTO.decimals),
         ),
         'total',
         side === 'BUY' ? messages.options.totalPaid : messages.options.totalReceived,

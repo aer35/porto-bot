@@ -134,7 +134,7 @@ test('history records the position held before and after each row, in replay ord
   assert.deepEqual(result.history, [
     { tx: b, before: 0, after: 5, realized: null },
     { tx: sp, before: 5, after: 8, realized: null },
-    { tx: s, before: 8, after: 5, realized: 3 * (30 - 20) / 100 },
+    { tx: s, before: 8, after: 5, realized: 3 * (30 - 20) / 1000 },
   ]);
 });
 
@@ -228,7 +228,7 @@ test('realized P/L uses the average cost at the moment of each sale', () => {
   // 10 @ $100, 10 @ $200 → avg $150; sell 5 @ $180 → +$150. Then 10 @ $50 → avg (15×150 + 10×50)/25 = $110;
   // sell 25 @ $100 → -$250.
   assert.deepEqual(
-    realized([buy(1000, 100, 1), buy(1000, 200, 2), sell(500, 180, 3), buy(1000, 50, 4), sell(2500, 100, 5)]),
+    realized([buy(10_000, 100, 1), buy(10_000, 200, 2), sell(5000, 180, 3), buy(10_000, 50, 4), sell(25_000, 100, 5)]),
     [150, -250],
   );
 });

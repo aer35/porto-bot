@@ -63,12 +63,12 @@ export function replay(rows: Tx[]): Replay {
     let realized: number | null = null;
 
     if (tx.sec_type === 'SPLIT') {
-      // shares is in hundredths, so this rounds half-up to the nearest 0.01 share; anything
+      // shares is in thousandths, so this rounds half-up to the nearest 0.001 share; anything
       // smaller is discarded along with its cost.
       pos.shares = Math.round((pos.shares * tx.split_to!) / tx.split_from!);
       pos.avgCost = (pos.avgCost * tx.split_from!) / tx.split_to!;
     } else if (tx.side === 'BUY') {
-      // Deliberately not divided by the scale (100 for stock): quantities are scaled on both sides
+      // Deliberately not divided by the scale (1000 for stock): quantities are scaled on both sides
       // of this weighted average, so the factor cancels. Only dollar amounts divide.
       pos.avgCost = (pos.shares * pos.avgCost + tx.shares! * tx.price!) / (pos.shares + tx.shares!);
       pos.shares += tx.shares!;

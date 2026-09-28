@@ -226,8 +226,8 @@ What the options mean:
 | Field    | Meaning                                                                                 |
 |----------|-----------------------------------------------------------------------------------------|
 | `ticker` | Symbol as on Yahoo Finance, like `AAPL`, but with a dot for share classes (`BRK.B`). For crypto, the coin and currency, like `BTC-USD`. Prices come from Yahoo, so a ticker it does not know gets no price |
-| `shares` | Number of shares, like `10.55`. Fractional shares are supported, up to 2 decimal places |
-| `amount` | Number of coins, like `0.00034`, up to 8 decimal places                                 |
+| `shares` | Number of shares, like `10.555`. Fractional shares are supported, up to 3 decimal places |
+| `amount` | Number of coins, like `0.00034`, up to 6 decimal places                                 |
 | `total`  | Crypto only: what you paid or received in total, in USD, like `100`. `amount:0.00001 total:100` means 0.00001 coins for $100, and the bot works out the price per coin. A sale can be `0` |
 | `type`   | Options only: `Call` or `Put`                                                           |
 | `strike` | Options only: the strike price per share, like `150`                                    |
@@ -242,7 +242,7 @@ What the options mean:
 
 A few things worth knowing:
 
-- Crypto amounts are kept to 8 decimal places but shown to 3, cut off rather than rounded. Every dollar amount, including
+- Crypto amounts are shown to 3 decimal places, cut off rather than rounded. Option contracts are whole numbers only. Every dollar amount, including
   prices and average costs, is shown rounded to the cent; prices are stored with up to 8 decimals.
 - Each option contract (ticker, call or put, strike and expiry) is its own holding. Contracts are never exercised; to
   close one, record a `/sell option` for the same contract, which also works after it has expired. A contract past its
