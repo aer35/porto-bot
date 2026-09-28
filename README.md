@@ -242,7 +242,8 @@ What the options mean:
 
 A few things worth knowing:
 
-- Crypto amounts are kept to 8 decimal places but shown to 3, cut off rather than rounded.
+- Crypto amounts are kept to 8 decimal places but shown to 3, cut off rather than rounded. Every dollar amount, including
+  prices and average costs, is shown rounded to the cent; prices are stored with up to 8 decimals.
 - Each option contract (ticker, call or put, strike and expiry) is its own holding. Contracts are never exercised; to
   close one, record a `/sell option` for the same contract, which also works after it has expired. A contract past its
   expiry stays in your holdings, marked `(expired)`, until you record the sale; one that expired worthless is sold for

@@ -1,16 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { money, total } from '../components/format.js';
+import { money } from '../components/format.js';
 import { historyLines } from '../components/historyLines.js';
 import { replay, type Tx } from '../components/ledger.js';
 import { messages } from '../strings/messages.js';
 
-test('money keeps at least 2 and at most 4 decimals (8 below $1), totals are always cents', () => {
+test('every dollar amount is shown in cents, per-unit prices and averages included', () => {
   assert.equal(money(1234.5), '$1,234.50');
-  assert.equal(money(150.123456), '$150.1235');
-  // Below a dollar, as coins often are, up to 8 decimals so the price does not show as $0.00.
-  assert.equal(money(0.00001234), '$0.00001234');
-  assert.equal(total(853.33336), '$853.33');
+  assert.equal(money(150.123456), '$150.12');
+  assert.equal(money(853.33336), '$853.33');
+  // Deliberately cents even below a cent: a coin priced at $0.00001234 shows as $0.00.
+  assert.equal(money(0.00001234), '$0.00');
 });
 
 test('every transaction renders as an action line then a metadata line', () => {
