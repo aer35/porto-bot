@@ -5,7 +5,7 @@ import { replay, type NewTx } from '../components/ledger.js';
 // config.ts validates env at import, so set it before loading anything that opens the database.
 Object.assign(process.env, { DISCORD_TOKEN: 't', DISCORD_CLIENT_ID: 'c', DISCORD_GUILD_ID: 'g', DB_PATH: ':memory:' });
 const { clearTicker, commitChange, rebuildAll, resetUser } = await import('../components/userLedger.js');
-const { holdersOf, holdingsOf, recentHistory, tickerHistory } = await import('../queries/holdings.js');
+const { holdersOf, holdingsOf, historyPage } = await import('../queries/holdings.js');
 const { userRows } = await import('../queries/transactions.js');
 const { db } = await import('../queries/db.js');
 const { UserError } = await import('../components/userError.js');
@@ -41,16 +41,16 @@ test('holdings and history match a full replay after buy, sell, amend, delete an
   const plain = (value: unknown) => JSON.parse(JSON.stringify(value));
   const byTicker = expected.positions.toSorted((a, b) => a.ticker.localeCompare(b.ticker));
   assert.deepEqual(plain(holdingsOf(u)), plain(byTicker));
-  assert.deepEqual(plain(recentHistory(u, 100)), plain(expected.history.toReversed()));
+  assert.deepEqual(plain(historyPage(u, null, 100, 0).rows), plain(expected.history.toReversed()));
 });
 
 test('a failed write leaves holdings and history unchanged', () => {
   const u = 'h2';
   commitChange(u, { insert: tx(u, {}) });
-  const [holdings, history] = [holdingsOf(u), recentHistory(u, 100)];
+  const [holdings, history] = [holdingsOf(u), historyPage(u, null, 100, 0).rows];
   assert.throws(() => commitChange(u, { insert: tx(u, { side: 'SELL', shares: 2000 }) }), UserError);
   assert.deepEqual(holdingsOf(u), holdings);
-  assert.deepEqual(recentHistory(u, 100), history);
+  assert.deepEqual(historyPage(u, null, 100, 0).rows, history);
 });
 
 test('a position sold to zero has no holdings row', () => {
@@ -68,20 +68,22 @@ test('history carries split counts and realized P/L, newest first, and pages by 
   commitChange(u, { insert: tx(u, { ticker: 'MSFT', trade_date: 4 * DAY }) });
 
   assert.deepEqual(
-    recentHistory(u, 3).map(({ tx, before, after, realized }) => [tx.ticker, tx.sec_type, before, after, realized]),
+    historyPage(u, null, 3, 0).rows.map(({ tx, before, after, realized }) => [tx.ticker, tx.sec_type, before, after, realized]),
     [
       ['MSFT', 'STOCK', 0, 1000, null],
       ['AAPL', 'STOCK', 750, 450, 30], // 3 shares × ($30 − $20 average after the split)
       ['AAPL', 'SPLIT', 500, 750, null],
     ],
   );
-  const first = tickerHistory(u, 'AAPL', 2, 0);
+  const first = historyPage(u, 'AAPL', 2, 0);
   assert.deepEqual([first.page, first.pageCount], [0, 2]);
   assert.deepEqual(first.rows.map((h) => [h.tx.sec_type, h.tx.side]), [['STOCK', 'SELL'], ['SPLIT', null]]);
-  const pastTheEnd = tickerHistory(u, 'AAPL', 2, 5);
+  const pastTheEnd = historyPage(u, 'AAPL', 2, 5);
   assert.equal(pastTheEnd.page, 1);
   assert.deepEqual(pastTheEnd.rows.map((h) => [h.tx.sec_type, h.tx.side]), [['STOCK', 'BUY']]);
-  assert.equal(tickerHistory(u, 'TSLA', 2, 0).pageCount, 0);
+  assert.equal(historyPage(u, 'TSLA', 2, 0).pageCount, 0);
+  assert.equal(historyPage(u, null, 3, 0).pageCount, 2); // null pages across every ticker
+
 });
 
 test('holdersOf lists members who currently hold a stock', () => {
@@ -98,19 +100,19 @@ test('clearTicker and resetUser keep holdings in step with the rows they delete'
   commitChange(u, { insert: tx(u, { ticker: 'MSFT' }) });
   assert.equal(clearTicker(u, 'AAPL'), 1);
   assert.deepEqual(holdingsOf(u).map((p) => p.ticker), ['MSFT']);
-  assert.equal(recentHistory(u, 100).length, 1);
+  assert.equal(historyPage(u, null, 100, 0).rows.length, 1);
   assert.equal(resetUser(u), 1);
   assert.deepEqual(holdingsOf(u), []);
-  assert.deepEqual(recentHistory(u, 100), []);
+  assert.deepEqual(historyPage(u, null, 100, 0).rows, []);
 });
 
 test('rebuildAll fills holdings and history from transactions alone, as on first boot after upgrading', () => {
   const u = 'h9';
   commitChange(u, { insert: tx(u, {}) });
   commitChange(u, { insert: tx(u, { side: 'SELL', shares: 400, price: 15, trade_date: 2 * DAY }) });
-  const [holdings, history] = [holdingsOf(u), recentHistory(u, 100)];
+  const [holdings, history] = [holdingsOf(u), historyPage(u, null, 100, 0).rows];
   db.exec('DELETE FROM holdings; DELETE FROM tx_history;');
   rebuildAll();
   assert.deepEqual(holdingsOf(u), holdings);
-  assert.deepEqual(recentHistory(u, 100), history);
+  assert.deepEqual(historyPage(u, null, 100, 0).rows, history);
 });

@@ -1,48 +1,106 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ComponentType, MessageFlags } from 'discord.js';
+import { ButtonStyle, Colors, ComponentType, MessageFlags } from 'discord.js';
 import type { Position } from '../components/ledger.js';
-import { portfolioView, positionView } from '../components/views.js';
+import { portfolioView, positionView, transactionsView } from '../components/views.js';
 
 const NOT_OPTION = { opt_right: null, strike: null, expiry: null };
 const aapl: Position = { ...NOT_OPTION, sec_type: 'STOCK', ticker: 'AAPL', shares: 1250, avgCost: 10 };
 const btc: Position = { ...NOT_OPTION, sec_type: 'CRYPTO', ticker: 'BTC-USD', shares: 50_000_000, avgCost: 60_000 };
 
 // The container's children as [type, text] pairs, text only for text displays.
-function children(view: ReturnType<typeof portfolioView>) {
-  const [container] = view.components.map((c) => c.toJSON()) as { type: number; components: { type: number; content?: string }[] }[];
+type View = ReturnType<typeof portfolioView>;
+type Json = { type: number; accent_color?: number; components: { type: number; content?: string; custom_id?: string; style?: number; disabled?: boolean; label?: string }[] };
+const json = (view: View) => view.components.map((c) => c.toJSON()) as Json[];
+
+function children(view: View) {
+  const [container] = json(view);
   assert.equal(container.type, ComponentType.Container);
   return container.components.map((c) => [c.type, c.content ?? null] as const);
 }
-const texts = (view: ReturnType<typeof portfolioView>) =>
+const texts = (view: View) =>
   children(view).filter(([type]) => type === ComponentType.TextDisplay).map(([, text]) => text!);
 
-test('portfolio renders as components, never pings, and lists holdings as lines with a cost total', () => {
-  const view = portfolioView('42', [aapl, btc], ['tx one', 'tx two']);
+
+// The buttons of every action row after the container, as [custom_id, label, style, disabled].
+const buttons = (view: View) =>
+  json(view)
+    .slice(1)
+    .flatMap((row) => row.components.map((b) => [b.custom_id, b.label, b.style, b.disabled ?? false] as const));
+
+const call: Position = { sec_type: 'OPTION', ticker: 'AAPL', shares: 1, avgCost: 2, opt_right: 'CALL', strike: 150, expiry: 1_800_000_000 };
+const msft: Position = { ...aapl, ticker: 'MSFT' };
+
+test('portfolio renders one tab as components, never pings, with a field label row, rows, and tab and overall cost', () => {
+  const view = portfolioView('42', 'STOCK', [call, aapl, btc, msft], 0);
   assert.equal(view.flags, MessageFlags.IsComponentsV2);
   assert.deepEqual(view.allowedMentions, { parse: [] });
+  assert.equal(json(view)[0].accent_color, Colors.Green);
   const all = texts(view).join('\n');
-  assert.match(all, /Portfolio of <@42>/);
-  assert.match(all, /\*\*AAPL\*\* · 12\.5 shares · avg \$10\.00 · cost \$125\.00/);
-  assert.match(all, /\*\*BTC-USD\*\* · 0\.5 coins · avg \$60,000\.00 · cost \$30,000\.00/);
-  assert.match(all, /\*\*Total cost basis\*\* \$30,125\.00/);
-  assert.doesNotMatch(all, /```/);
+  assert.match(all, /## Portfolio of <@42>\n### Stocks/);
+  assert.match(all, /-# Ticker · Shares · Avg cost · Cost basis\n\*\*AAPL\*\* · 12\.5 · \$10\.00 · \$125\.00\n\*\*MSFT\*\*/);
+  assert.match(all, /\*\*Cost basis\*\* \$250\.00 · \*\*Total, all holdings\*\* \$30,450\.00/);
+  assert.doesNotMatch(all, /BTC-USD|CALL|```/);
 });
 
-test('each transaction is its own text display, with a separator component between entries', () => {
-  const kinds = children(portfolioView('42', [aapl], ['tx one', 'tx two', 'tx three']));
+test('each holdings tab has its own colour, label row and rows, and an empty tab says so', () => {
+  const crypto = portfolioView('42', 'CRYPTO', [call, aapl, btc], 0);
+  assert.equal(json(crypto)[0].accent_color, Colors.Blue);
+  assert.match(texts(crypto).join('\n'), /### Crypto\n-# Coin · Coins · Avg cost · Cost basis\n\*\*BTC-USD\*\* · 0\.5 · \$60,000\.00 · \$30,000\.00/);
+
+  const options = portfolioView('42', 'OPTION', [call, aapl, btc], 0);
+  assert.equal(json(options)[0].accent_color, Colors.Red);
+  assert.match(texts(options).join('\n'), /### Options\n-# Contract · Contracts · Avg price · Cost basis\n\*\*AAPL CALL \$150\.00 \d{4}-\d{2}-\d{2}\*\* · 1 · \$2\.00 · \$200\.00/);
+
+  const empty = texts(portfolioView('42', 'CRYPTO', [aapl], 0)).join('\n');
+  assert.match(empty, /No crypto holdings\./);
+  assert.doesNotMatch(empty, /-# Coin/);
+  assert.match(texts(portfolioView('42', 'STOCK', [], 0)).join('\n'), /No stock holdings\./);
+});
+
+test('the tab buttons switch tabs, the open tab is highlighted, and no two buttons share a custom ID', () => {
+  const view = portfolioView('42', 'CRYPTO', [aapl, btc], 0);
+  assert.deepEqual(buttons(view), [
+    ['portfolio:STOCK:0:42:tab', 'Stocks', ButtonStyle.Secondary, false],
+    ['portfolio:CRYPTO:0:42:tab', 'Crypto', ButtonStyle.Primary, false],
+    ['portfolio:OPTION:0:42:tab', 'Options', ButtonStyle.Secondary, false],
+    ['portfolio:TX:0:42:tab', 'Transactions', ButtonStyle.Secondary, false],
+  ]);
+});
+
+test('a holdings tab shows 10 rows a page, with page buttons only when there is more than one page', () => {
+  const stocks = Array.from({ length: 12 }, (_, i): Position => ({ ...aapl, ticker: `T${String(i).padStart(2, '0')}` }));
+  const first = portfolioView('42', 'STOCK', stocks, 0);
+  const rows = (view: View) => texts(view).join('\n').match(/\*\*T\d\d\*\*/g) ?? [];
+  assert.equal(rows(first).length, 10);
+  assert.match(texts(first).join('\n'), /Page 1 of 2/);
+  const ids = buttons(first).map(([id]) => id);
+  assert.equal(new Set(ids).size, ids.length);
+  assert.deepEqual(buttons(first).slice(4).map(([id, , , disabled]) => [id, disabled]), [['portfolio:STOCK:-1:42', true], ['portfolio:STOCK:1:42', false]]);
+
+  const pastTheEnd = portfolioView('42', 'STOCK', stocks, 9);
+  assert.deepEqual(rows(pastTheEnd), ['**T10**', '**T11**']);
+  assert.match(texts(pastTheEnd).join('\n'), /Page 2 of 2/);
+
+  assert.equal(buttons(portfolioView('42', 'STOCK', stocks.slice(0, 10), 0)).length, 4);
+});
+
+test('the transactions tab is yellow, with each transaction its own text display between separators, and pages', () => {
+  const view = transactionsView('42', ['tx one', 'tx two', 'tx three'], 1, 3);
+  assert.equal(json(view)[0].accent_color, Colors.Yellow);
+  const kinds = children(view);
   const from = kinds.findIndex(([, text]) => text === 'tx one');
   assert.deepEqual(
-    kinds.slice(from).map(([type]) => type),
+    kinds.slice(from, from + 5).map(([type]) => type),
     [ComponentType.TextDisplay, ComponentType.Separator, ComponentType.TextDisplay, ComponentType.Separator, ComponentType.TextDisplay],
   );
-});
+  assert.match(texts(view).join('\n'), /### Transactions[\s\S]*Page 2 of 3/);
+  assert.equal(buttons(view)[3][2], ButtonStyle.Primary);
+  assert.deepEqual(buttons(view).slice(4).map(([id]) => id), ['portfolio:TX:0:42', 'portfolio:TX:2:42']);
 
-test('portfolio with nothing held or recorded says so', () => {
-  const all = texts(portfolioView('42', [], [])).join('\n');
-  assert.match(all, /No holdings\./);
-  assert.match(all, /None yet\./);
-  assert.doesNotMatch(all, /Total/);
+  const none = transactionsView('42', [], 0, 0);
+  assert.match(texts(none).join('\n'), /No transactions yet\./);
+  assert.equal(buttons(none).length, 4);
 });
 
 test('position shows its holdings and a page of transactions, with page buttons only when there is more than one page', () => {
@@ -62,25 +120,18 @@ test('position shows its holdings and a page of transactions, with page buttons 
   );
 });
 
-test('portfolio groups holdings into stock, crypto and option sections, hiding empty ones, with one total', () => {
-  const call: Position = { sec_type: 'OPTION', ticker: 'AAPL', shares: 1, avgCost: 2, opt_right: 'CALL', strike: 150, expiry: 1_800_000_000 };
-  const msft: Position = { ...aapl, ticker: 'MSFT' };
-  const all = texts(portfolioView('42', [call, aapl, btc, msft], [])).join('\n');
-  assert.match(all, /\*\*Stocks\*\*\n\*\*AAPL\*\*.*\n\*\*MSFT\*\*/);
-  assert.ok(all.indexOf('**Stocks**') < all.indexOf('**Crypto**') && all.indexOf('**Crypto**') < all.indexOf('**Options**'));
-  assert.match(all, /\*\*Options\*\*\n\*\*AAPL CALL/);
-  assert.match(all, /\*\*Total cost basis\*\* \$30,450\.00/);
 
-  const stocksOnly = texts(portfolioView('42', [aapl], [])).join('\n');
-  assert.match(stocksOnly, /\*\*Stocks\*\*/);
-  assert.doesNotMatch(stocksOnly, /Crypto|Options/);
-});
+test('a priced holding adds price, value and P/L to its row, and the totals add value, counting unpriced holdings at cost', () => {
+  const priced = texts(portfolioView('42', 'STOCK', [{ ...aapl, price: 12 }, { ...btc, price: 70_000 }], 0)).join('\n');
+  assert.match(priced, /-# Ticker · Shares · Avg cost · Cost basis · Price · Value · P\/L\n\*\*AAPL\*\* · 12\.5 · \$10\.00 · \$125\.00 · \$12\.00 · \$150\.00 · \+\$25\.00/);
+  assert.match(priced, /\*\*Cost basis\*\* \$125\.00 · \*\*Value\*\* \$150\.00 · \*\*Total, all holdings\*\* \$30,125\.00 cost, \$35,150\.00 value$/m);
 
-test('the total adds current value next to cost, counting holdings without a price at cost', () => {
-  const priced = texts(portfolioView('42', [{ ...aapl, price: 12 }, { ...btc, price: 70_000 }], [])).join('\n');
-  assert.match(priced, /\*\*Total cost basis\*\* \$30,125\.00 · \*\*value\*\* \$35,150\.00$/m);
-  const partly = texts(portfolioView('42', [{ ...aapl, price: 12 }, btc], [])).join('\n');
-  assert.match(partly, /\*\*Total cost basis\*\* \$30,125\.00 · \*\*value\*\* \$30,150\.00 \(1 at cost, no price yet\)$/m);
-  const none = texts(portfolioView('42', [aapl], [])).join('\n');
-  assert.match(none, /\*\*Total cost basis\*\* \$125\.00$/m);
+  const partly = texts(portfolioView('42', 'STOCK', [{ ...aapl, price: 12 }, msft, btc], 0)).join('\n');
+  assert.match(partly, /\*\*MSFT\*\* · 12\.5 · \$10\.00 · \$125\.00$/m);
+  assert.match(partly, /\*\*Value\*\* \$275\.00 \(1 at cost, no price yet\)/);
+  assert.match(partly, /\$30,250\.00 cost, \$30,275\.00 value \(2 at cost, no price yet\)$/m);
+
+  const position = texts(positionView('42', 'AAPL', [{ ...aapl, price: 12 }], ['tx'], 0, 1)).join('\n');
+  assert.match(position, /price \$12\.00 · value \$150\.00 · P\/L \+\$25\.00/);
+  assert.match(position, /\*\*Total cost basis\*\* \$125\.00 · \*\*value\*\* \$150\.00$/m);
 });

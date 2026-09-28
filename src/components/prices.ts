@@ -22,6 +22,10 @@ export function priceSymbol(p: Priced) {
 // A position with its latest stored price, null until the nightly job has one.
 export type Holding = Position & { price?: number | null };
 
+// Totals of some holdings: cost basis, value at current prices with holdings that have no price
+// counted at cost (null when none has a price), and how many have no price.
+export type Totals = { cost: number; current: number | null; unpriced: number };
+
 export const withPrices = (positions: Position[]): Holding[] =>
   positions.map((p) => ({ ...p, price: priceOf(priceSymbol(p)) }));
 

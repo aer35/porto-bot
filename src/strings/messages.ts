@@ -1,6 +1,6 @@
 import { date, money, total } from '../components/format.js';
 import type { Tx } from '../components/ledger.js';
-import type { Holding } from '../components/prices.js';
+import type { Holding, Totals } from '../components/prices.js';
 import { formatQuantity, value, type Holdable } from '../components/units.js';
 import { toDateString } from '../components/validate.js';
 
@@ -35,15 +35,21 @@ const action = (tx: Tx, counts?: [number, number]) =>
   tx.sec_type === 'SPLIT'
     ? `**SPLIT** ${tx.split_to}:${tx.split_from} of **${tx.ticker}**` +
       (counts ? ` — ${formatQuantity('STOCK', counts[0])} → ${formatQuantity('STOCK', counts[1])} shares` : '')
-    : `**${tx.side}** ${formatQuantity(tx.sec_type, tx.shares!)} × ${unit(tx)} of **${tx.ticker}**${contract(tx)} @ ${money(tx.price!)}`;
+    : `**${tx.side}** ${formatQuantity(tx.sec_type, tx.shares!)} × ${unit(tx)} of **${tx.ticker}**${contract(tx)} ` +
+      // Crypto is bought for a total ("0.5 BTC for $30,000"); the price per coin goes on the next line.
+      (tx.sec_type === 'CRYPTO' ? `for ${total(value(tx.sec_type, tx.shares!, tx.price!))}` : `@ ${money(tx.price!)}`);
 
 // Realized P/L with its sign, e.g. "+$150.00" or "-$0.50".
 const signed = (n: number) => (n < 0 ? '-' : '+') + total(Math.abs(n));
 
+// "(2 at cost, no price yet)" after a value that counts holdings without a price at their cost.
+const atCost = (t: Totals) => (t.unpriced ? ` (${t.unpriced} at cost, no price yet)` : '');
+
 const meta = (tx: Tx, realized?: number | null) =>
   tx.sec_type === 'SPLIT'
     ? `\`${tx.ref}\` · ${date(tx.trade_date)}`
-    : `\`${tx.ref}\` · total ${total(value(tx.sec_type, tx.shares!, tx.price!))} · ` +
+    : `\`${tx.ref}\` · ` +
+      (tx.sec_type === 'CRYPTO' ? `${money(tx.price!)} per coin · ` : `total ${total(value(tx.sec_type, tx.shares!, tx.price!))} · `) +
       (realized != null ? `P/L ${signed(realized)} · ` : '') +
       date(tx.trade_date);
 
@@ -79,7 +85,8 @@ export const messages = {
     anyTicker: 'Ticker symbol, e.g. AAPL or BTC-USD',
     cryptoTicker: 'Coin and currency as on Yahoo Finance, e.g. BTC-USD. BTC alone means BTC-USD',
     amount: 'Number of coins, up to 8 decimals, e.g. 0.00034',
-    coinPrice: 'Price per coin',
+    totalPaid: 'What you paid in total, in USD, e.g. 100',
+    totalReceived: 'What you received in total, in USD, e.g. 100',
     optionTicker: 'Underlying stock ticker as on Yahoo Finance, e.g. AAPL',
     right: 'Call or put',
     strike: 'Strike price per share, e.g. 150',
@@ -93,6 +100,7 @@ export const messages = {
 
   invalidTicker: 'Tickers are 1–6 letters or dots, like `AAPL` or `BRK.B`.',
   invalidLookupTicker: 'Tickers are up to 15 letters, digits, dots or dashes, like `AAPL` or `BTC-USD`.',
+  invalidTotal: 'Total must be above 0 and at most $10,000,000, with at most 8 decimals, like `100`.',
   invalidRight: 'Choose `Call` or `Put`.',
   invalidStrike: 'Strike must be above 0 and at most $10,000,000, with at most 8 decimals, like `150`.',
   invalidExpiry: 'Expiry must be `YYYY-MM-DD`, and today or later for a buy.',
@@ -122,19 +130,29 @@ export const messages = {
   recorded: (userId: string, tx: Tx, realized: number | null) => `**Trade recorded**\n<@${userId}> ${txLine(tx, { realized })}`,
 
   portfolio: {
-    description: 'Show holdings and recent transactions',
+    description: 'Show holdings and transactions, one tab per security type',
     title: (userId: string) => `## Portfolio of <@${userId}>`,
-    holdings: '### Holdings',
-    noHoldings: 'No holdings.',
-    section: { STOCK: '**Stocks**', CRYPTO: '**Crypto**', OPTION: '**Options**' },
-    // `current` is the value at current prices, with `unpriced` holdings counted at cost; left out
-    // when no holding has a price yet.
-    total: (cost: number, current: number | null, unpriced: number) =>
-      `**Total cost basis** ${total(cost)}` +
-      (current === null ? '' : ` · **value** ${total(current)}`) +
-      (current !== null && unpriced ? ` (${unpriced} at cost, no price yet)` : ''),
-    recent: '### Recent transactions',
-    noRecent: 'None yet.',
+    // Tab button labels, also the heading above the open tab.
+    tabs: { STOCK: 'Stocks', CRYPTO: 'Crypto', OPTION: 'Options', TX: 'Transactions' },
+    // The field label row above a holdings tab's rows, naming each field of holdingRow in order.
+    columns: {
+      STOCK: '-# Ticker · Shares · Avg cost · Cost basis',
+      CRYPTO: '-# Coin · Coins · Avg cost · Cost basis',
+      OPTION: '-# Contract · Contracts · Avg price · Cost basis',
+    },
+    empty: { STOCK: 'No stock holdings.', CRYPTO: 'No crypto holdings.', OPTION: 'No option holdings.' },
+    // Added to a tab's label row once some holding in it has a price (see holdingRow).
+    priceColumns: ' · Price · Value · P/L',
+    // /position's single total; /portfolio shows the open tab's totals beside those of every holding.
+    // Value appears once some holding has a price, with the rest counted at cost.
+    total: (t: Totals) =>
+      `**Total cost basis** ${total(t.cost)}` + (t.current === null ? '' : ` · **value** ${total(t.current)}${atCost(t)}`),
+    tabTotal: (tab: Totals, all: Totals) =>
+      `**Cost basis** ${total(tab.cost)}` +
+      (tab.current === null ? '' : ` · **Value** ${total(tab.current)}${atCost(tab)}`) +
+      ` · **Total, all holdings** ${total(all.cost)}` +
+      (all.current === null ? '' : ` cost, ${total(all.current)} value${atCost(all)}`),
+    noTransactions: 'No transactions yet.',
   },
 
   position: {
@@ -161,6 +179,7 @@ export const messages = {
       amount: 'Amount (coins)',
       contracts: 'Contracts',
       price: 'Price per share',
+      total: 'Total (USD)',
       date: 'Date (YYYY-MM-DD)',
     },
     split: 'Split rows cannot be amended. Use /delete to undo a split.',
@@ -190,13 +209,21 @@ export const messages = {
       `Applied a ${ratio.split_to}:${ratio.split_from} split to **${ticker}** for ${count} ${count === 1 ? 'member' : 'members'}.`,
   },
 
-  // One holding in /portfolio and /position: position, quantity, average cost, cost basis, and
-  // once the nightly job has a price, that price, the current value and the unrealized P/L.
+  // One holding in /position: position, quantity, average cost, cost basis, and once the nightly
+  // job has a price, that price, the current value and the unrealized P/L.
   holdingLine: (p: Holding) =>
     `**${positionLabel(p)}** · ${formatQuantity(p.sec_type, p.shares)} ${quantityUnit[p.sec_type]} · ` +
     `avg ${money(p.avgCost)} · cost ${total(value(p.sec_type, p.shares, p.avgCost))}` +
     (p.price != null
       ? ` · price ${money(p.price)} · value ${total(value(p.sec_type, p.shares, p.price))} · ` +
         `P/L ${signed(value(p.sec_type, p.shares, p.price - p.avgCost))}`
+      : ''),
+
+  // One holding in a /portfolio tab: the same fields as holdingLine, named once by portfolio.columns
+  // (and priceColumns, once priced).
+  holdingRow: (p: Holding) =>
+    `**${positionLabel(p)}** · ${formatQuantity(p.sec_type, p.shares)} · ${money(p.avgCost)} · ${total(value(p.sec_type, p.shares, p.avgCost))}` +
+    (p.price != null
+      ? ` · ${money(p.price)} · ${total(value(p.sec_type, p.shares, p.price))} · ${signed(value(p.sec_type, p.shares, p.price - p.avgCost))}`
       : ''),
 };

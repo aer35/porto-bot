@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatQuantity, parseQuantity, quantityText, toScaled, units, value } from '../components/units.js';
+import { formatQuantity, parseQuantity, quantityText, toScaled, unitPrice, units, value } from '../components/units.js';
 
 test('stock is stored in hundredths and crypto in 100,000,000ths, independently', () => {
   assert.equal(units.STOCK.scale, 100);
@@ -62,4 +62,12 @@ test('whole-unit quantities (option contracts) parse and print without decimals,
   assert.equal(quantityText(20, 'OPTION'), '20');
   assert.equal(quantityText(100, 'OPTION'), '100');
   assert.equal(quantityText(10_000, 'STOCK'), '100');
+});
+
+test('unitPrice turns a total paid for a stored quantity back into a per-unit price, the inverse of value', () => {
+  // 0.00001 BTC for $100 is $10,000,000 per coin.
+  assert.equal(unitPrice('CRYPTO', 1000, 100), 10_000_000);
+  assert.equal(unitPrice('CRYPTO', 34_000, 34), 100_000);
+  const price = unitPrice('CRYPTO', 34_000, 100);
+  assert.ok(Math.abs(value('CRYPTO', 34_000, price) - 100) < 1e-9);
 });

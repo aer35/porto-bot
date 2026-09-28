@@ -12,7 +12,7 @@ import { tickerAutocomplete } from './tickerAutocomplete.js';
 import { realizedOf } from '../queries/holdings.js';
 import { commitChange } from './userLedger.js';
 import { UserError } from './userError.js';
-import { toScaled, units, type Holdable } from './units.js';
+import { toScaled, unitPrice, units, type Holdable } from './units.js';
 import {
   ANY_TICKER_MAX,
   MAX_PRICE,
@@ -130,16 +130,20 @@ const types: Record<string, SecurityType> = {
         tickerOption(sub, side, 'CRYPTO', messages.options.cryptoTicker).addNumberOption((o) =>
           o.setName('amount').setDescription(messages.options.amount).setRequired(true).setMinValue(1 / units.CRYPTO.scale),
         ),
-        'price',
-        messages.options.coinPrice,
+        'total',
+        side === 'BUY' ? messages.options.totalPaid : messages.options.totalReceived,
       ),
-    read: (options) => ({
-      sec_type: 'CRYPTO',
-      ticker: readTicker(options, 'CRYPTO'),
-      shares: readQuantity(options.getNumber('amount', true), 'CRYPTO'),
-      price: readPrice(options, 'price', messages.invalidPrice),
-      ...NOT_SPLIT_OR_OPTION,
-    }),
+    read(options) {
+      const shares = readQuantity(options.getNumber('amount', true), 'CRYPTO');
+      const total = readPrice(options, 'total', messages.invalidTotal);
+      return {
+        sec_type: 'CRYPTO',
+        ticker: readTicker(options, 'CRYPTO'),
+        shares,
+        price: unitPrice('CRYPTO', shares, total),
+        ...NOT_SPLIT_OR_OPTION,
+      };
+    },
   },
   option: {
     sec_type: 'OPTION',

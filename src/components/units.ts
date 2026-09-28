@@ -55,6 +55,12 @@ export function quantityText(quantity: number, type: Holdable) {
 export const value = (type: Holdable, quantity: number, price: number) =>
   (quantity * price * units[type].multiplier) / units[type].scale;
 
+// The per-unit price that makes `total` dollars for a stored quantity: the inverse of value. Crypto
+// is entered as what was paid in total ("0.00001 BTC for $100"), but stored per coin like every
+// other price, so average cost, P/L and market prices all work the same way.
+export const unitPrice = (type: Holdable, quantity: number, total: number) =>
+  (total * units[type].scale) / (quantity * units[type].multiplier);
+
 // A stored quantity for display: 1278 STOCK → "12.78", 123456789 CRYPTO → "1.234".
 export function formatQuantity(type: Holdable, quantity: number) {
   const { scale, shown } = units[type];

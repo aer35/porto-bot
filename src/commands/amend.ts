@@ -14,7 +14,7 @@ import { commitChange } from '../components/userLedger.js';
 import { realizedOf } from '../queries/holdings.js';
 import { UserError } from '../components/userError.js';
 import { parseRef } from '../components/ref.js';
-import { parseQuantity, quantityText } from '../components/units.js';
+import { parseQuantity, quantityText, unitPrice, value } from '../components/units.js';
 import { rules } from '../components/trade.js';
 import { parseDate, parsePrice, priceText, toDateString } from '../components/validate.js';
 import { messages } from '../strings/messages.js';
@@ -64,7 +64,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         field('side', labels.side, row.side!, 3, 4),
         // Stored scaled; shown as the decimal the user typed, which parseQuantity reads back.
         field('shares', quantityLabel[row.sec_type], quantityText(row.shares!, row.sec_type), 1, 20),
-        field('price', labels.price, priceText(row.price!), 1, 20),
+        // Crypto is edited as the total paid, like /buy crypto takes it; everything else per unit.
+        row.sec_type === 'CRYPTO'
+          ? field('price', labels.total, priceText(value('CRYPTO', row.shares!, row.price!)), 1, 20)
+          : field('price', labels.price, priceText(row.price!), 1, 20),
         field('date', labels.date, toDateString(row.trade_date), 10, 10),
       ),
   );
@@ -76,16 +79,17 @@ export async function modal(interaction: ModalSubmitInteraction, [ref]: string[]
   const row = ownRow(ref, interaction.user.id);
   if (row.sec_type === 'SPLIT') throw new UserError(messages.amend.split);
   const type = rules[row.sec_type];
-  const value = (name: string) => interaction.fields.getTextInputValue(name);
-  const ticker = type.parseTicker(value('ticker'));
+  const input = (name: string) => interaction.fields.getTextInputValue(name);
+  const ticker = type.parseTicker(input('ticker'));
   if (!ticker) throw new UserError(type.invalidTicker);
-  const side = value('side').trim().toUpperCase();
+  const side = input('side').trim().toUpperCase();
   if (side !== 'BUY' && side !== 'SELL') throw new UserError(messages.amend.invalidSide);
-  const shares = parseQuantity(value('shares'), row.sec_type);
+  const shares = parseQuantity(input('shares'), row.sec_type);
   if (shares === null) throw new UserError(type.invalidQuantity);
-  const price = parsePrice(value('price'));
-  if (price === null) throw new UserError(messages.invalidPrice);
-  const trade_date = parseDate(value('date'), config.tz);
+  const typed = parsePrice(input('price'));
+  if (typed === null) throw new UserError(row.sec_type === 'CRYPTO' ? messages.invalidTotal : messages.invalidPrice);
+  const price = row.sec_type === 'CRYPTO' ? unitPrice('CRYPTO', shares, typed) : typed;
+  const trade_date = parseDate(input('date'), config.tz);
   if (trade_date === null) throw new UserError(messages.invalidDate);
 
   const stored = commitChange(interaction.user.id, { update: { ...row, ticker, side, shares, price, trade_date } })!;

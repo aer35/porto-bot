@@ -60,26 +60,33 @@ test('invalid stock input is a UserError', () => {
   }
 });
 
-test('/buy and /sell each have a crypto subcommand with an amount instead of shares', () => {
+test('/buy and /sell each have a crypto subcommand with an amount and a total instead of shares and a price', () => {
   for (const side of ['BUY', 'SELL'] as const) {
     const json = trade(side).data.toJSON();
     const crypto = json.options!.find((o) => o.name === 'crypto') as { options: { name: string; max_length?: number }[] };
-    assert.deepEqual(crypto.options.map((o) => o.name), ['ticker', 'amount', 'price', 'date']);
+    assert.deepEqual(crypto.options.map((o) => o.name), ['ticker', 'amount', 'total', 'date']);
     assert.equal(crypto.options[0].max_length, 15);
   }
 });
 
 test('a crypto trade reads into a CRYPTO row, at the crypto scale, priced in USD by default', () => {
-  const row = tradeRow('u', 'BUY', 'crypto', typed({ ticker: 'btc', amount: 0.00034, price: 100_000 }), 'UTC', NOW);
+  const row = tradeRow('u', 'BUY', 'crypto', typed({ ticker: 'btc', amount: 0.00034, total: 34 }), 'UTC', NOW);
   assert.equal(row.sec_type, 'CRYPTO');
   assert.equal(row.ticker, 'BTC-USD');
   assert.equal(row.shares, 34_000);
   assert.equal(row.price, 100_000);
 });
 
+test('a crypto trade takes what was paid in total and stores the price per coin', () => {
+  // "Bought 0.00001 BTC for $100", not "at $100 per BTC".
+  const row = tradeRow('u', 'BUY', 'crypto', typed({ ticker: 'BTC', amount: 0.00001, total: 100 }), 'UTC', NOW);
+  assert.equal(row.shares, 1000);
+  assert.equal(row.price, 10_000_000);
+});
+
 test('invalid crypto input is a UserError', () => {
-  const base = { ticker: 'BTC-USD', amount: 1, price: 1 };
-  const bads: Record<string, string | number>[] = [{ ticker: 'BTC.USD' }, { amount: 0.000000001 }, { amount: 100_000_000 }, { price: 0 }];
+  const base = { ticker: 'BTC-USD', amount: 1, total: 1 };
+  const bads: Record<string, string | number>[] = [{ ticker: 'BTC.USD' }, { amount: 0.000000001 }, { amount: 100_000_000 }, { total: 0 }, { total: 20_000_000 }];
   for (const bad of bads) {
     assert.throws(() => tradeRow('u', 'BUY', 'crypto', typed({ ...base, ...bad }), 'UTC', NOW), UserError);
   }

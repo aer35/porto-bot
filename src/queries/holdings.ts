@@ -74,16 +74,14 @@ const historyRows = (userId: string, ticker: string | null, limit: number, offse
       .all(userId, ticker, ticker, limit, offset) as HistoryRow[]
   ).map(toEntry);
 
-// A member's newest `limit` transactions, for /portfolio.
-export const recentHistory = (userId: string, limit: number) => historyRows(userId, null, limit, 0);
-
-// One page of a member's transactions for one ticker, newest first, with how many pages there
-// are. `page` is clamped to the pages that exist, since rows may have changed since a Previous or
-// Next button was sent. pageCount is 0 when the member has no rows for the ticker.
-export function tickerHistory(userId: string, ticker: string, pageSize: number, page: number) {
+// One page of a member's transactions, for one ticker or (ticker null) every ticker, newest first,
+// with how many pages there are. `page` is clamped to the pages that exist, since rows may have
+// changed since a Previous or Next button was sent. pageCount is 0 when there are no rows.
+export function historyPage(userId: string, ticker: string | null, pageSize: number, page: number) {
+  // Counts the same rows historyRows selects, to size the page buttons.
   const { count } = db
-    .prepare('SELECT count(*) AS count FROM transactions WHERE user_id = ? AND ticker = ?')
-    .get(userId, ticker) as { count: number };
+    .prepare('SELECT count(*) AS count FROM transactions WHERE user_id = ? AND (? IS NULL OR ticker = ?)')
+    .get(userId, ticker, ticker) as { count: number };
   const pageCount = Math.ceil(count / pageSize);
   page = Math.min(Math.max(page, 0), Math.max(pageCount - 1, 0));
   return { rows: historyRows(userId, ticker, pageSize, page * pageSize), page, pageCount };
