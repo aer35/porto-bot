@@ -7,9 +7,10 @@ import {
 } from 'discord.js';
 import { config } from '../config.js';
 import { messages } from '../strings/messages.js';
-import type { NewTx } from './ledger.js';
+import type { NewTx, Position } from './ledger.js';
 import { tickerAutocomplete } from './tickerAutocomplete.js';
-import { realizedOf } from '../queries/holdings.js';
+import { holdingsOf, realizedOf } from '../queries/holdings.js';
+import { money } from './format.js';
 import { commitChange } from './userLedger.js';
 import { UserError } from './userError.js';
 import { toScaled, unitPrice, units, type Holdable } from './units.js';
@@ -17,12 +18,14 @@ import {
   ANY_TICKER_MAX,
   MAX_PRICE,
   MIN_PRICE,
-  parseCalendarDate,
   parseCryptoTicker,
   parseDate,
   parseExpiry,
+  parseShortDate,
   parseTicker,
+  shortDate,
   STOCK_TICKER_MAX,
+  toDateString,
   toPrice,
 } from './validate.js';
 
@@ -79,11 +82,14 @@ const tickerOption = (sub: SlashCommandSubcommandBuilder, side: Side, type: Hold
       .setAutocomplete(side === 'SELL'),
   );
 
-// A price-per-unit option, with the limits toPrice checks.
-const priceOption = (sub: SlashCommandSubcommandBuilder, name: string, description: string) =>
+// A price-per-unit option, with the limits toPrice checks. `min` is 0 where a sale may be for nothing.
+const priceOption = (sub: SlashCommandSubcommandBuilder, name: string, description: string, min = MIN_PRICE, autocomplete = false) =>
   sub.addNumberOption((o) =>
-    o.setName(name).setDescription(description).setRequired(true).setMinValue(MIN_PRICE).setMaxValue(MAX_PRICE),
+    o.setName(name).setDescription(description).setRequired(true).setMinValue(min).setMaxValue(MAX_PRICE).setAutocomplete(autocomplete),
   );
+
+// The lowest price or total a trade may be: a sale may be for nothing, a buy may not.
+const minPrice = (side: Side) => (side === 'SELL' ? 0 : MIN_PRICE);
 
 // Discord number options cannot limit decimal places, so the quantity and price rules are checked here.
 function readTicker(options: TradeOptions, type: Holdable) {
@@ -98,8 +104,8 @@ function readQuantity(amount: number, type: Holdable) {
   return scaled;
 }
 
-function readPrice(options: TradeOptions, name: string, invalid: string) {
-  const price = toPrice(options.getNumber(name, true));
+function readPrice(options: TradeOptions, name: string, invalid: string, zeroOk = false) {
+  const price = toPrice(options.getNumber(name, true), zeroOk);
   if (price === null) throw new UserError(invalid);
   return price;
 }
@@ -114,12 +120,13 @@ const types: Record<string, SecurityType> = {
         ),
         'price',
         messages.options.price,
+        minPrice(side),
       ),
-    read: (options) => ({
+    read: (options, side) => ({
       sec_type: 'STOCK',
       ticker: readTicker(options, 'STOCK'),
       shares: readQuantity(options.getNumber('shares', true), 'STOCK'),
-      price: readPrice(options, 'price', messages.invalidPrice),
+      price: readPrice(options, 'price', messages.invalidPrice, side === 'SELL'),
       ...NOT_SPLIT_OR_OPTION,
     }),
   },
@@ -132,10 +139,11 @@ const types: Record<string, SecurityType> = {
         ),
         'total',
         side === 'BUY' ? messages.options.totalPaid : messages.options.totalReceived,
+        minPrice(side),
       ),
-    read(options) {
+    read(options, side) {
       const shares = readQuantity(options.getNumber('amount', true), 'CRYPTO');
-      const total = readPrice(options, 'total', messages.invalidTotal);
+      const total = readPrice(options, 'total', messages.invalidTotal, side === 'SELL');
       return {
         sec_type: 'CRYPTO',
         ticker: readTicker(options, 'CRYPTO'),
@@ -152,40 +160,79 @@ const types: Record<string, SecurityType> = {
         priceOption(
           tickerOption(sub, side, 'OPTION', messages.options.optionTicker).addStringOption((o) =>
             o
-              .setName('right')
-              .setDescription(messages.options.right)
+              .setName('type')
+              .setDescription(messages.options.type)
               .setRequired(true)
               .addChoices({ name: 'Call', value: 'CALL' }, { name: 'Put', value: 'PUT' }),
           ),
           'strike',
           messages.options.strike,
+          MIN_PRICE,
+          side === 'SELL',
         )
+          // Lengths of MM/DD/YY at its shortest ("1/5") and longest ("12/24/26").
           .addStringOption((o) =>
-            o.setName('expiry').setDescription(messages.options.expiry).setRequired(true).setMinLength(10).setMaxLength(10),
+            o
+              .setName('expiry')
+              .setDescription(messages.options.expiry)
+              .setRequired(true)
+              .setMinLength(3)
+              .setMaxLength(8)
+              .setAutocomplete(side === 'SELL'),
           )
           .addIntegerOption((o) =>
             o.setName('contracts').setDescription(messages.options.contracts).setRequired(true).setMinValue(1),
           ),
         'price',
         messages.options.premium,
+        minPrice(side),
       ),
     read(options, side, tz, now) {
       const ticker = readTicker(options, 'OPTION');
       // Discord only offers the two choices, but a stale client could still send anything.
-      const opt_right = options.getString('right', true);
-      if (opt_right !== 'CALL' && opt_right !== 'PUT') throw new UserError(messages.invalidRight);
+      const opt_right = options.getString('type', true);
+      if (opt_right !== 'CALL' && opt_right !== 'PUT') throw new UserError(messages.invalidOptionType);
       const strike = readPrice(options, 'strike', messages.invalidStrike);
       // Only a buy opens a position, so only a buy needs a contract that has not expired. A sell must
       // match a contract already held (replay rejects anything else), and may close one after expiry.
       const typed = options.getString('expiry', true);
-      const expiry = side === 'BUY' ? parseExpiry(typed, tz, now) : parseCalendarDate(typed);
+      const expiry = side === 'BUY' ? parseExpiry(typed, tz, now) : parseShortDate(typed, tz, now);
       if (expiry === null) throw new UserError(messages.invalidExpiry);
       const shares = readQuantity(options.getInteger('contracts', true), 'OPTION');
-      const price = readPrice(options, 'price', messages.invalidPrice);
+      const price = readPrice(options, 'price', messages.invalidPrice, side === 'SELL');
       return { sec_type: 'OPTION', ticker, shares, price, ...NOT_SPLIT_OR_OPTION, opt_right, strike, expiry };
     },
   },
 };
+
+// /sell option's suggestions for the focused strike or expiry: those of the option contracts held,
+// narrowed by the ticker, type and strike already picked (each ignored while empty or invalid) and by
+// what has been typed so far. An expiry that has passed is still offered, marked, since it may
+// still be held. `now` is only overridden by tests.
+export function contractChoices(
+  held: Position[],
+  field: 'strike' | 'expiry',
+  typed: string,
+  picked: { ticker: string | null; type: string | null; strike: number | null },
+  now = new Date(),
+) {
+  const ticker = picked.ticker && parseTicker(picked.ticker);
+  const matching = held.filter(
+    (p) => (!ticker || p.ticker === ticker) && (!picked.type || p.opt_right === picked.type) && (picked.strike == null || p.strike === picked.strike),
+  );
+  const today = toDateString(now.getTime() / 1000);
+  const choices =
+    field === 'strike'
+      ? [...new Set(matching.map((p) => p.strike!))].sort((a, b) => a - b).map((strike) => ({ name: money(strike), value: strike }))
+      : [...new Set(matching.map((p) => p.expiry!))]
+          .sort((a, b) => a - b)
+          .map((expiry) => ({
+            name: shortDate(expiry) + (toDateString(expiry) < today ? ' (expired)' : ''),
+            value: shortDate(expiry),
+          }));
+  // Discord allows at most 25 choices.
+  return choices.filter((c) => String(c.value).startsWith(typed.trim())).slice(0, 25);
+}
 
 // The row a /buy or /sell subcommand would insert, validated. `now` is only overridden by tests.
 export function tradeRow(user_id: string, side: Side, type: string, options: TradeOptions, tz: string, now = new Date()): NewTx {
@@ -217,9 +264,21 @@ export function trade(side: Side) {
     });
   }
 
-  // Only /sell autocompletes, from what the user holds of that subcommand's type.
-  const autocomplete = (interaction: AutocompleteInteraction) =>
-    tickerAutocomplete(interaction, interaction.user.id, types[interaction.options.getSubcommand()].sec_type);
+  // Only /sell autocompletes, from what the user holds of that subcommand's type: the ticker, and
+  // for an option also the strike and expiry of the contracts held.
+  async function autocomplete(interaction: AutocompleteInteraction) {
+    const userId = interaction.user.id;
+    const { name, value } = interaction.options.getFocused(true);
+    if (name !== 'strike' && name !== 'expiry') {
+      return tickerAutocomplete(interaction, userId, types[interaction.options.getSubcommand()].sec_type);
+    }
+    const picked = {
+      ticker: interaction.options.getString('ticker'),
+      type: interaction.options.getString('type'),
+      strike: name === 'expiry' ? interaction.options.getNumber('strike') : null,
+    };
+    await interaction.respond(contractChoices(holdingsOf(userId, 'OPTION'), name, String(value), picked));
+  }
 
   return { data, execute, autocomplete };
 }

@@ -39,7 +39,7 @@ const field = (id: string, label: string, value: string, min: number, max: numbe
     );
 
 // The label of the quantity field for each type of row. A modal holds at most 5 fields, so an
-// option's right, strike and expiry are not editable here; a wrong contract is fixed with /delete
+// option's type (call or put), strike and expiry are not editable here; a wrong contract is fixed with /delete
 // and a new /buy option.
 const quantityLabel = {
   STOCK: messages.amend.fields.shares,
@@ -86,7 +86,8 @@ export async function modal(interaction: ModalSubmitInteraction, [ref]: string[]
   if (side !== 'BUY' && side !== 'SELL') throw new UserError(messages.amend.invalidSide);
   const shares = parseQuantity(input('shares'), row.sec_type);
   if (shares === null) throw new UserError(type.invalidQuantity);
-  const typed = parsePrice(input('price'));
+  // A sale may be for nothing, as in /sell.
+  const typed = parsePrice(input('price'), side === 'SELL');
   if (typed === null) throw new UserError(row.sec_type === 'CRYPTO' ? messages.invalidTotal : messages.invalidPrice);
   const price = row.sec_type === 'CRYPTO' ? unitPrice('CRYPTO', shares, typed) : typed;
   const trade_date = parseDate(input('date'), config.tz);

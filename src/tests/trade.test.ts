@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 // config.ts validates env at import, so set it before loading anything that opens the database.
 Object.assign(process.env, { DISCORD_TOKEN: 't', DISCORD_CLIENT_ID: 'c', DISCORD_GUILD_ID: 'g', DB_PATH: ':memory:' });
-const { trade, tradeRow } = await import('../components/trade.js');
+const { contractChoices, trade, tradeRow } = await import('../components/trade.js');
 const { UserError } = await import('../components/userError.js');
 
 // Stands in for interaction.options: the values a user typed, by option name.
@@ -96,15 +96,17 @@ test('/buy and /sell each have an option subcommand', () => {
   for (const side of ['BUY', 'SELL'] as const) {
     const json = trade(side).data.toJSON();
     const option = json.options!.find((o) => o.name === 'option') as {
-      options: { name: string; choices?: { value: string }[] }[];
+      options: { name: string; choices?: { value: string }[]; autocomplete?: boolean }[];
     };
-    assert.deepEqual(option.options.map((o) => o.name), ['ticker', 'right', 'strike', 'expiry', 'contracts', 'price', 'date']);
+    assert.deepEqual(option.options.map((o) => o.name), ['ticker', 'type', 'strike', 'expiry', 'contracts', 'price', 'date']);
     assert.deepEqual(option.options[1].choices!.map((c) => c.value), ['CALL', 'PUT']);
+    // /sell suggests the strikes and expiries of contracts held; /buy has nothing to suggest.
+    assert.deepEqual([option.options[2].autocomplete ?? false, option.options[3].autocomplete ?? false], [side === 'SELL', side === 'SELL']);
   }
 });
 
 test('an option trade reads into an OPTION row with whole contracts and an expiry date', () => {
-  const values = { ticker: 'aapl', right: 'CALL', strike: 150, expiry: '2026-06-19', contracts: 2, price: 3.2 };
+  const values = { ticker: 'aapl', type: 'CALL', strike: 150, expiry: '06/19', contracts: 2, price: 3.2 };
   const row = tradeRow('u', 'BUY', 'option', typed(values), 'UTC', NOW);
   assert.deepEqual(
     [row.sec_type, row.ticker, row.opt_right, row.strike, row.expiry, row.shares, row.price],
@@ -113,9 +115,10 @@ test('an option trade reads into an OPTION row with whole contracts and an expir
 });
 
 test('invalid option input is a UserError', () => {
-  const base = { ticker: 'AAPL', right: 'PUT', strike: 150, expiry: '2026-06-19', contracts: 1, price: 1 };
+  const base = { ticker: 'AAPL', type: 'PUT', strike: 150, expiry: '06/19/26', contracts: 1, price: 1 };
   const bads: Record<string, string | number>[] = [
-    { ticker: 'BTC-USD' }, { right: 'STRADDLE' }, { strike: 0 }, { expiry: '2026-03-09' }, { contracts: 0 }, { contracts: 1.5 },
+    { ticker: 'BTC-USD' }, { type: 'STRADDLE' }, { strike: 0 }, { expiry: '03/09' }, { expiry: '2026-06-19' }, { contracts: 0 },
+    { contracts: 1.5 }, { price: 0 },
   ];
   for (const bad of bads) {
     assert.throws(() => tradeRow('u', 'BUY', 'option', typed({ ...base, ...bad }), 'UTC', NOW), UserError, JSON.stringify(bad));
@@ -123,11 +126,65 @@ test('invalid option input is a UserError', () => {
 });
 
 test('an option can be sold after its expiry, closing a position bought before it, but not bought', () => {
-  const values = { ticker: 'AAPL', right: 'CALL', strike: 150, expiry: '2026-03-06', contracts: 1, price: 0.01 };
+  const values = { ticker: 'AAPL', type: 'CALL', strike: 150, expiry: '03/06', contracts: 1, price: 0.01 };
   const row = tradeRow('u', 'SELL', 'option', typed(values), 'UTC', NOW);
   assert.equal(row.expiry, Date.parse('2026-03-06T12:00:00Z') / 1000);
   assert.throws(() => tradeRow('u', 'BUY', 'option', typed(values), 'UTC', NOW), UserError);
-  assert.throws(() => tradeRow('u', 'SELL', 'option', typed({ ...values, expiry: '2026-02-30' }), 'UTC', NOW), UserError);
+  assert.throws(() => tradeRow('u', 'SELL', 'option', typed({ ...values, expiry: '02/30' }), 'UTC', NOW), UserError);
+});
+
+test('a sale may be recorded at $0 for every type, but a buy may not', () => {
+  const zero = {
+    stock: { ticker: 'AAPL', shares: 1, price: 0 },
+    crypto: { ticker: 'BTC', amount: 1, total: 0 },
+    option: { ticker: 'AAPL', type: 'CALL', strike: 150, expiry: '03/06', contracts: 1, price: 0 },
+  };
+  for (const [type, values] of Object.entries(zero)) {
+    assert.equal(tradeRow('u', 'SELL', type, typed(values), 'UTC', NOW).price, 0, type);
+    assert.throws(() => tradeRow('u', 'BUY', type, typed({ ...values, expiry: '06/19' }), 'UTC', NOW), UserError, type);
+  }
+  // Discord enforces the same floor before the bot sees the value.
+  const minOf = (side: 'BUY' | 'SELL', sub: string, name: string) =>
+    (trade(side).data.toJSON().options as { name: string; options: { name: string; min_value?: number }[] }[])
+      .find((o) => o.name === sub)!.options.find((o) => o.name === name)!.min_value;
+  assert.deepEqual([minOf('SELL', 'stock', 'price'), minOf('SELL', 'crypto', 'total'), minOf('SELL', 'option', 'price')], [0, 0, 0]);
+  assert.ok(minOf('BUY', 'stock', 'price')! > 0);
+  assert.ok(minOf('SELL', 'option', 'strike')! > 0);
+});
+
+const contract = (opt_right: 'CALL' | 'PUT', strike: number, expiry: string, ticker = 'AAPL') => ({
+  sec_type: 'OPTION' as const, ticker, opt_right, strike, expiry: Date.parse(`${expiry}T12:00:00Z`) / 1000, shares: 1, avgCost: 1,
+});
+const held = [
+  contract('CALL', 150, '2026-06-19'),
+  contract('CALL', 150, '2026-09-18'),
+  contract('CALL', 160, '2026-06-19'),
+  contract('PUT', 140, '2026-01-16'),
+  contract('CALL', 50, '2026-06-19', 'MSFT'),
+];
+const none = { ticker: null, type: null, strike: null };
+
+test('/sell option suggests the strikes held, narrowed by the ticker and type already chosen', () => {
+  assert.deepEqual(contractChoices(held, 'strike', '', { ...none, ticker: 'aapl' }, NOW), [
+    { name: '$140.00', value: 140 },
+    { name: '$150.00', value: 150 },
+    { name: '$160.00', value: 160 },
+  ]);
+  assert.deepEqual(contractChoices(held, 'strike', '', { ...none, ticker: 'AAPL', type: 'CALL' }, NOW).map((c) => c.value), [150, 160]);
+  assert.deepEqual(contractChoices(held, 'strike', '16', { ...none, ticker: 'AAPL' }, NOW).map((c) => c.value), [160]);
+});
+
+test('/sell option suggests the expiries held as MM/DD/YY, marking any that have passed', () => {
+  assert.deepEqual(contractChoices(held, 'expiry', '', { ticker: 'AAPL', type: 'CALL', strike: 150 }, NOW), [
+    { name: '06/19/26', value: '06/19/26' },
+    { name: '09/18/26', value: '09/18/26' },
+  ]);
+  assert.deepEqual(contractChoices(held, 'expiry', '', { ...none, ticker: 'AAPL', type: 'PUT' }, NOW), [
+    { name: '01/16/26 (expired)', value: '01/16/26' },
+  ]);
+  assert.deepEqual(contractChoices(held, 'expiry', '09', { ...none, ticker: 'AAPL' }, NOW).map((c) => c.value), ['09/18/26']);
+  // With no ticker typed yet, every held contract is a candidate, each listed once.
+  assert.deepEqual(contractChoices(held, 'expiry', '', none, NOW).map((c) => c.value), ['01/16/26', '06/19/26', '09/18/26']);
 });
 
 test('every /buy and /sell ticker option names Yahoo Finance as the ticker source, within Discord\'s 100 characters', () => {

@@ -43,10 +43,27 @@ export function parseDate(input: string | undefined, tz: string, now = new Date(
   return date > todayIn(tz, now) ? null : parseCalendarDate(date);
 }
 
-// An expiry for a new option position: today or later in `tz`, the opposite of parseDate.
-export function parseExpiry(input: string, tz: string, now = new Date()) {
-  return input.trim() < todayIn(tz, now) ? null : parseCalendarDate(input);
+// A date typed as MM/DD/YY or MM/DD (this year in `tz`), like 12/24 or 1/15/27, to unix seconds at
+// 12:00 UTC. Option expiries are typed this way; trade dates stay YYYY-MM-DD.
+export function parseShortDate(input: string, tz: string, now = new Date()) {
+  const match = input.trim().match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2}))?$/);
+  if (!match) return null;
+  const [, month, day, yy] = match;
+  const year = yy ? `20${yy}` : todayIn(tz, now).slice(0, 4);
+  return parseCalendarDate(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
 }
+
+// An expiry for a new option position: MM/DD/YY or MM/DD, today or later in `tz`.
+export function parseExpiry(input: string, tz: string, now = new Date()) {
+  const expiry = parseShortDate(input, tz, now);
+  return expiry === null || toDateString(expiry) < todayIn(tz, now) ? null : expiry;
+}
+
+// A stored date as MM/DD/YY, the form parseShortDate reads.
+export const shortDate = (unix: number) => {
+  const [year, month, day] = toDateString(unix).split('-');
+  return `${month}/${day}/${year.slice(2)}`;
+};
 
 export const toDateString = (unix: number) => new Date(unix * 1000).toISOString().slice(0, 10);
 
@@ -64,17 +81,18 @@ export const MAX_PRICE = 10_000_000;
 export const MIN_PRICE = 0.00000001;
 
 // A price per unit from a Discord number option: above 0, at most MAX_PRICE, at most 8 decimals
-// (enough for a coin priced below a cent). toFixed(8) round-trips exactly when there are 8 or
-// fewer decimals, and unlike String() it never switches to 1e-7 notation.
-export function toPrice(price: number) {
-  return price > 0 && price <= MAX_PRICE && Number(price.toFixed(8)) === price ? price : null;
+// (enough for a coin priced below a cent). A sale may also be at exactly 0 (`zeroOk`), for a
+// position sold or expired worthless. toFixed(8) round-trips exactly when there are 8 or fewer
+// decimals, and unlike String() it never switches to 1e-7 notation.
+export function toPrice(price: number, zeroOk = false) {
+  return (price > 0 || (zeroOk && price === 0)) && price <= MAX_PRICE && Number(price.toFixed(8)) === price ? price : null;
 }
 
 // A price as plain decimal text that parsePrice reads back: 1e-7 becomes "0.0000001".
 export const priceText = (price: number) => price.toFixed(8).replace(/\.?0+$/, '');
 
 // A typed price from the /amend modal, like "$1,234.50", by the same rules as toPrice.
-export function parsePrice(input: string) {
+export function parsePrice(input: string, zeroOk = false) {
   const cleaned = input.trim().replace(/[$,]/g, '');
-  return /^\d*\.?\d+$/.test(cleaned) ? toPrice(Number(cleaned)) : null;
+  return /^\d*\.?\d+$/.test(cleaned) ? toPrice(Number(cleaned), zeroOk) : null;
 }

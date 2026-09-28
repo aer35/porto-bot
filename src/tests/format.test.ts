@@ -61,6 +61,8 @@ test('a crypto transaction shows coins, truncated to 3 decimals, what they cost 
 });
 
 const JAN_16 = Date.parse('2026-01-16T12:00:00Z') / 1000;
+// Far enough ahead that the contract is never expired when the tests run.
+const JAN_16_2099 = Date.parse('2099-01-16T12:00:00Z') / 1000;
 
 test('an option transaction names the contract, and its total is 100 × contracts × price', () => {
   const tx = {
@@ -70,15 +72,19 @@ test('an option transaction names the contract, and its total is 100 × contract
   };
   assert.equal(
     messages.txLine(tx),
-    '**BUY** 2 × CALL of **AAPL** $150.00 2026-01-16 @ $3.20\n`BOC01` · total $640.00 · <t:1767268800:D>',
+    '**BUY** 2 × CALL of **AAPL** $150.00 01/16/26 @ $3.20\n`BOC01` · total $640.00 · <t:1767268800:D>',
   );
 });
 
 test('an option holdings line names the contract and multiplies the cost basis by 100', () => {
-  assert.equal(
-    messages.holdingLine({ sec_type: 'OPTION', ticker: 'AAPL', shares: 2, avgCost: 3.2, opt_right: 'PUT', strike: 150, expiry: JAN_16 }),
-    '**AAPL PUT $150.00 2026-01-16** · 2 contracts · avg $3.20 · cost $640.00',
-  );
+  const put = { sec_type: 'OPTION' as const, ticker: 'AAPL', shares: 2, avgCost: 3.2, opt_right: 'PUT' as const, strike: 150, expiry: JAN_16_2099 };
+  assert.equal(messages.holdingLine(put), '**AAPL PUT $150.00 01/16/99** · 2 contracts · avg $3.20 · cost $640.00');
+});
+
+test('an option held past its expiry stays in holdings, marked expired', () => {
+  const put = { sec_type: 'OPTION' as const, ticker: 'AAPL', shares: 2, avgCost: 3.2, opt_right: 'PUT' as const, strike: 150, expiry: JAN_16 };
+  assert.equal(messages.holdingLine(put), '**AAPL PUT $150.00 01/16/26** (expired) · 2 contracts · avg $3.20 · cost $640.00');
+  assert.equal(messages.holdingRow(put), '**AAPL PUT $150.00 01/16/26** (expired) · 2 · $3.20 · $640.00');
 });
 
 test('a sell shows its realized P/L when known, signed', () => {

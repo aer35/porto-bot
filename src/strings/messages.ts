@@ -2,7 +2,7 @@ import { date, money, total } from '../components/format.js';
 import type { Tx } from '../components/ledger.js';
 import type { Holding, Totals } from '../components/prices.js';
 import { formatQuantity, value, type Holdable } from '../components/units.js';
-import { toDateString } from '../components/validate.js';
+import { shortDate, toDateString } from '../components/validate.js';
 
 // Every transaction renders the same way, in two lines:
 //
@@ -10,7 +10,7 @@ import { toDateString } from '../components/validate.js';
 //   `REF` · total TOTAL · DATE
 //
 // Rows that have no price, like splits, put their detail on the first line and drop the total. An
-// option names its contract after the ticker: "**BUY** 2 × CALL of **AAPL** $150.00 2026-01-16 @ $3.20".
+// option names its contract after the ticker: "**BUY** 2 × CALL of **AAPL** $150.00 01/16/26 @ $3.20".
 // A sell adds "P/L +$12.34" before the date. In /portfolio and /position each transaction is its
 // own text display, with a Separator component between entries (src/components/views.ts); elsewhere
 // it is a plain message or embed. Holdings are one line each, see holdingLine.
@@ -24,12 +24,21 @@ const unit = (tx: Tx) => (tx.sec_type === 'OPTION' ? tx.opt_right : quantityUnit
 
 type Contract = Pick<Tx, 'sec_type' | 'strike' | 'expiry'>;
 
-// An option's strike and expiry, after its ticker: " $150.00 2026-01-16". Empty for anything else.
-const contract = (p: Contract) => (p.sec_type === 'OPTION' ? ` ${money(p.strike!)} ${toDateString(p.expiry!)}` : '');
+// An option's strike and expiry, after its ticker: " $150.00 01/16/26". Empty for anything else.
+const contract = (p: Contract) => (p.sec_type === 'OPTION' ? ` ${money(p.strike!)} ${shortDate(p.expiry!)}` : '');
 
-// A position's name: the ticker, and for an option the contract, e.g. "AAPL CALL $150.00 2026-01-16".
+// A position's name: the ticker, and for an option the contract, e.g. "AAPL CALL $150.00 01/16/26".
 const positionLabel = (p: Contract & Pick<Tx, 'ticker' | 'opt_right'>) =>
   p.sec_type === 'OPTION' ? `${p.ticker} ${p.opt_right}${contract(p)}` : p.ticker;
+
+// A held option past its expiry stays held until the member records the sale (possibly at $0), so
+// it is marked instead of dropped. Shortcut: "past" is by UTC date, so the mark appears at 00:00 UTC
+// after the expiry date, a few hours after the 16:00 New York close, whatever TZ is set to.
+const expired = (p: Contract) =>
+  p.sec_type === 'OPTION' && toDateString(p.expiry!) < toDateString(Date.now() / 1000) ? ' (expired)' : '';
+
+// A holding's name in bold, then the expired mark if any.
+const holdingLabel = (p: Holding) => `**${positionLabel(p)}**${expired(p)}`;
 
 const action = (tx: Tx, counts?: [number, number]) =>
   tx.sec_type === 'SPLIT'
@@ -86,11 +95,11 @@ export const messages = {
     cryptoTicker: 'Coin and currency as on Yahoo Finance, e.g. BTC-USD. BTC alone means BTC-USD',
     amount: 'Number of coins, up to 8 decimals, e.g. 0.00034',
     totalPaid: 'What you paid in total, in USD, e.g. 100',
-    totalReceived: 'What you received in total, in USD, e.g. 100',
+    totalReceived: 'What you received in total, in USD, e.g. 100. Can be 0',
     optionTicker: 'Underlying stock ticker as on Yahoo Finance, e.g. AAPL',
-    right: 'Call or put',
+    type: 'Call or put',
     strike: 'Strike price per share, e.g. 150',
-    expiry: 'Expiry date as YYYY-MM-DD. For a buy, today or later',
+    expiry: 'Expiry as MM/DD/YY, or MM/DD for this year. For a buy, today or later',
     contracts: 'Number of contracts, a whole number',
     premium: 'Price per share of one contract as quoted, e.g. 3.20. A contract costs 100 times this',
     date: 'Trade date as YYYY-MM-DD. Defaults to today',
@@ -100,16 +109,16 @@ export const messages = {
 
   invalidTicker: 'Tickers are 1–6 letters or dots, like `AAPL` or `BRK.B`.',
   invalidLookupTicker: 'Tickers are up to 15 letters, digits, dots or dashes, like `AAPL` or `BTC-USD`.',
-  invalidTotal: 'Total must be above 0 and at most $10,000,000, with at most 8 decimals, like `100`.',
-  invalidRight: 'Choose `Call` or `Put`.',
+  invalidTotal: 'Total must be above 0 (a sale can be 0) and at most $10,000,000, with at most 8 decimals, like `100`.',
+  invalidOptionType: 'Choose `Call` or `Put`.',
   invalidStrike: 'Strike must be above 0 and at most $10,000,000, with at most 8 decimals, like `150`.',
-  invalidExpiry: 'Expiry must be `YYYY-MM-DD`, and today or later for a buy.',
+  invalidExpiry: 'Expiry must be `MM/DD/YY`, or `MM/DD` for this year, like `12/24`. For a buy, today or later.',
   invalidContracts: 'Contracts must be a whole number, 1 or more.',
   invalidRef: 'Transaction IDs look like `BSS01` (buy), `SSS01` (sell) or `XSS01` (split).',
   invalidShares: 'Shares must be above 0 with at most 2 decimals, like `12.78`.',
   invalidCryptoTicker: 'Crypto tickers are a coin and a currency, like `BTC-USD`, or just the coin, like `BTC`.',
   invalidAmount: 'Amount must be above 0 and below 90,000,000, with at most 8 decimals, like `0.00034`.',
-  invalidPrice: 'Price must be above 0 and at most $10,000,000, with at most 8 decimals, like `150.25`.',
+  invalidPrice: 'Price must be above 0 (a sale can be 0) and at most $10,000,000, with at most 8 decimals, like `150.25`.',
   invalidDate: 'Dates must be `YYYY-MM-DD` and not in the future.',
   oversold: (tx: Tx) =>
     `That would leave you with a negative **${positionLabel(tx)}** position as of ${date(tx.trade_date)}. Nothing was changed.`,
@@ -212,7 +221,7 @@ export const messages = {
   // One holding in /position: position, quantity, average cost, cost basis, and once the nightly
   // job has a price, that price, the current value and the unrealized P/L.
   holdingLine: (p: Holding) =>
-    `**${positionLabel(p)}** · ${formatQuantity(p.sec_type, p.shares)} ${quantityUnit[p.sec_type]} · ` +
+    `${holdingLabel(p)} · ${formatQuantity(p.sec_type, p.shares)} ${quantityUnit[p.sec_type]} · ` +
     `avg ${money(p.avgCost)} · cost ${total(value(p.sec_type, p.shares, p.avgCost))}` +
     (p.price != null
       ? ` · price ${money(p.price)} · value ${total(value(p.sec_type, p.shares, p.price))} · ` +
@@ -222,7 +231,7 @@ export const messages = {
   // One holding in a /portfolio tab: the same fields as holdingLine, named once by portfolio.columns
   // (and priceColumns, once priced).
   holdingRow: (p: Holding) =>
-    `**${positionLabel(p)}** · ${formatQuantity(p.sec_type, p.shares)} · ${money(p.avgCost)} · ${total(value(p.sec_type, p.shares, p.avgCost))}` +
+    `${holdingLabel(p)} · ${formatQuantity(p.sec_type, p.shares)} · ${money(p.avgCost)} · ${total(value(p.sec_type, p.shares, p.avgCost))}` +
     (p.price != null
       ? ` · ${money(p.price)} · ${total(value(p.sec_type, p.shares, p.price))} · ${signed(value(p.sec_type, p.shares, p.price - p.avgCost))}`
       : ''),

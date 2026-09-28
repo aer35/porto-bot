@@ -211,8 +211,8 @@ Wherever this README shows a `docker compose run --rm porto-bot node dist/...` c
 | `/sell stock`         | Record shares you sold                           | `ticker`, `shares`, `price` | `date`   |
 | `/buy crypto`         | Record crypto you bought                         | `ticker`, `amount`, `total` | `date`   |
 | `/sell crypto`        | Record crypto you sold                           | `ticker`, `amount`, `total` | `date`   |
-| `/buy option`         | Record option contracts you bought               | `ticker`, `right`, `strike`, `expiry`, `contracts`, `price` | `date` |
-| `/sell option`        | Record option contracts you sold                 | `ticker`, `right`, `strike`, `expiry`, `contracts`, `price` | `date` |
+| `/buy option`         | Record option contracts you bought               | `ticker`, `type`, `strike`, `expiry`, `contracts`, `price` | `date` |
+| `/sell option`        | Record option contracts you sold                 | `ticker`, `type`, `strike`, `expiry`, `contracts`, `price` | `date` |
 | `/portfolio`          | Show holdings and transactions, one tab per type | —                           | `user`   |
 | `/position`           | Show every transaction for one ticker            | `ticker`                    | `user`   |
 | `/amend`              | Fix a transaction you entered wrong              | `id`                        | —        |
@@ -228,12 +228,12 @@ What the options mean:
 | `ticker` | Symbol as on Yahoo Finance, like `AAPL`, but with a dot for share classes (`BRK.B`). For crypto, the coin and currency, like `BTC-USD`. Prices come from Yahoo, so a ticker it does not know gets no price |
 | `shares` | Number of shares, like `10.55`. Fractional shares are supported, up to 2 decimal places |
 | `amount` | Number of coins, like `0.00034`, up to 8 decimal places                                 |
-| `total`  | Crypto only: what you paid or received in total, in USD, like `100`. `amount:0.00001 total:100` means 0.00001 coins for $100, and the bot works out the price per coin |
-| `right`  | Options only: `Call` or `Put`                                                           |
+| `total`  | Crypto only: what you paid or received in total, in USD, like `100`. `amount:0.00001 total:100` means 0.00001 coins for $100, and the bot works out the price per coin. A sale can be `0` |
+| `type`   | Options only: `Call` or `Put`                                                           |
 | `strike` | Options only: the strike price per share, like `150`                                    |
-| `expiry` | Options only: the expiry date as `YYYY-MM-DD`. When buying, today or later              |
+| `expiry` | Options only: the expiry date as `MM/DD/YY`, or `MM/DD` for this year, like `12/24`. When buying, today or later. `/sell option` suggests the strikes and expiries you hold |
 | `contracts` | Options only: number of contracts, a whole number                                    |
-| `price`  | Price per share in USD, above 0, up to 8 decimals. A leading `$` is optional. For options, the price per share as quoted: a contract costs 100 times this |
+| `price`  | Price per share in USD, above 0 (a sale can be `0`), up to 8 decimals. A leading `$` is optional. For options, the price per share as quoted: a contract costs 100 times this |
 | `date`   | Trade date as `YYYY-MM-DD`, cannot be in the future. Defaults to today                  |
 | `user`   | Whose transactions to show. Defaults to you                                             |
 | `id`     | A transaction reference, like `BSS01`                                                   |
@@ -244,8 +244,9 @@ A few things worth knowing:
 
 - Crypto amounts are kept to 8 decimal places but shown to 3, cut off rather than rounded.
 - Each option contract (ticker, call or put, strike and expiry) is its own holding. Contracts are never exercised; to
-  close one, record a `/sell option` for the same contract, which also works after it has expired. An expired contract
-  cannot be bought. `/amend` can change an option's contracts, price and date, but not the contract itself.
+  close one, record a `/sell option` for the same contract, which also works after it has expired. A contract past its
+  expiry stays in your holdings, marked `(expired)`, until you record the sale; one that expired worthless is sold for
+  `0`. An expired contract cannot be bought. `/amend` can change an option's contracts, price and date, but not the contract itself.
 - Every transaction gets a short ID like `BSS01` (buy), `SSS01` (sell) or `XSS01` (split), shown beside it. Crypto
   uses `BCC01` and `SCC01`, and options `BOC01`, `BOP01`, `SOC01` and `SOP01` (call or put). That is what you type into `/amend` and `/delete`. IDs from before version 2 gained a letter: `BS01` is now `BSS01`, `SS01`
   is `SSS01` and `SL01` is `XSS01`.

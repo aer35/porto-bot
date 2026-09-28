@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseCalendarDate, parseCryptoTicker, parseDate, parseExpiry, parseLookupTicker, parsePrice, parseRatio, parseTicker, toDateString, toPrice, priceText,
+  parseCalendarDate, parseCryptoTicker, parseDate, parseExpiry, parseLookupTicker, parsePrice, parseRatio, parseShortDate, parseTicker, shortDate,
+  toDateString, toPrice, priceText,
 } from '../components/validate.js';
 
 test('parseTicker uppercases and accepts 1-6 letters or dots', () => {
@@ -62,6 +63,15 @@ test('toPrice checks a Discord number option by the same rules as parsePrice', (
   for (const bad of [0, -5, 1.123456789, 10_000_001, Infinity, NaN]) assert.equal(toPrice(bad), null, String(bad));
 });
 
+test('a sale may be priced at $0: toPrice and parsePrice accept 0 only when asked to', () => {
+  assert.equal(toPrice(0, true), 0);
+  assert.equal(parsePrice('0', true), 0);
+  assert.equal(parsePrice('$0.00', true), 0);
+  assert.equal(toPrice(-1, true), null);
+  assert.equal(parsePrice('-1', true), null);
+  assert.equal(toPrice(0), null);
+});
+
 test('priceText writes a price as plain decimals that parsePrice reads back', () => {
   for (const price of [150, 150.25, 1e-7, 0.00000001, 3.2]) assert.equal(parsePrice(priceText(price)), price, String(price));
   assert.equal(priceText(1e-7), '0.0000001');
@@ -85,13 +95,34 @@ test('parseLookupTicker accepts any stored ticker shape as typed, without normal
   for (const bad of ['', 'A B', "A'", 'ABCDEFGHIJKLMNOP']) assert.equal(parseLookupTicker(bad), null, bad);
 });
 
-test('parseExpiry accepts today or later in the configured time zone, the opposite of parseDate', () => {
+test('parseShortDate reads MM/DD/YY, and MM/DD as this year in the configured time zone', () => {
   // now is 2026-03-09 in New York.
-  assert.equal(parseExpiry('2026-03-09', 'America/New_York', now), noonUtc('2026-03-09'));
-  assert.equal(parseExpiry('2027-01-15', 'America/New_York', now), noonUtc('2027-01-15'));
-  for (const bad of ['2026-03-08', '2026-02-30', '2026-3-20', '', 'friday']) {
+  assert.equal(parseShortDate('12/24', 'America/New_York', now), noonUtc('2026-12-24'));
+  assert.equal(parseShortDate(' 12/24/27 ', 'America/New_York', now), noonUtc('2027-12-24'));
+  assert.equal(parseShortDate('1/5', 'America/New_York', now), noonUtc('2026-01-05'));
+  assert.equal(parseShortDate('01/05/26', 'America/New_York', now), noonUtc('2026-01-05'));
+  // Any past date is fine here; only a buy needs a future expiry (parseExpiry).
+  assert.equal(parseShortDate('02/29/24', 'America/New_York', now), noonUtc('2024-02-29'));
+  // On New Year's Eve in New York it is already the next year in UTC; the year comes from New York.
+  assert.equal(parseShortDate('06/19', 'America/New_York', new Date('2027-01-01T02:00:00Z')), noonUtc('2026-06-19'));
+  for (const bad of ['02/30', '02/29/26', '13/01', '00/10', '12/24/2026', '2026-12-24', '12-24', '', 'friday']) {
+    assert.equal(parseShortDate(bad, 'America/New_York', now), null, bad);
+  }
+});
+
+test('parseExpiry accepts MM/DD/YY or MM/DD, today or later in the configured time zone', () => {
+  // now is 2026-03-09 in New York.
+  assert.equal(parseExpiry('03/09', 'America/New_York', now), noonUtc('2026-03-09'));
+  assert.equal(parseExpiry('1/15/27', 'America/New_York', now), noonUtc('2027-01-15'));
+  for (const bad of ['03/08', '03/08/26', '02/30', '2027-01-15', '', 'friday']) {
     assert.equal(parseExpiry(bad, 'America/New_York', now), null, bad);
   }
+});
+
+test('shortDate formats a stored date as MM/DD/YY, which parseShortDate reads back', () => {
+  assert.equal(shortDate(noonUtc('2026-12-24')), '12/24/26');
+  assert.equal(shortDate(noonUtc('2027-01-05')), '01/05/27');
+  assert.equal(parseShortDate(shortDate(noonUtc('2027-01-05')), 'UTC', now), noonUtc('2027-01-05'));
 });
 
 test('parseCalendarDate accepts any real date, past or future', () => {

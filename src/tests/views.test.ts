@@ -50,7 +50,7 @@ test('each holdings tab has its own colour, label row and rows, and an empty tab
 
   const options = portfolioView('42', 'OPTION', [call, aapl, btc], 0);
   assert.equal(json(options)[0].accent_color, Colors.Red);
-  assert.match(texts(options).join('\n'), /### Options\n-# Contract · Contracts · Avg price · Cost basis\n\*\*AAPL CALL \$150\.00 \d{4}-\d{2}-\d{2}\*\* · 1 · \$2\.00 · \$200\.00/);
+  assert.match(texts(options).join('\n'), /### Options\n-# Contract · Contracts · Avg price · Cost basis\n\*\*AAPL CALL \$150\.00 01\/15\/27\*\* · 1 · \$2\.00 · \$200\.00/);
 
   const empty = texts(portfolioView('42', 'CRYPTO', [aapl], 0)).join('\n');
   assert.match(empty, /No crypto holdings\./);
