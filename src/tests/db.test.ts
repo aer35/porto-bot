@@ -11,7 +11,7 @@ Object.assign(process.env, { DISCORD_TOKEN: 't', DISCORD_CLIENT_ID: 'c', DISCORD
 const { db } = await import('../queries/db.js');
 
 test('a write waits for another process holding the database, instead of failing as locked', async () => {
-  // Stands in for `node dist/fetchPrices.js` run in a second container: it takes the write lock,
+  // Stands in for `node dist/fetchPrices.js` run beside the bot with docker compose exec: it takes the write lock,
   // then commits 200 ms later.
   const other = new Worker(
     `const { DatabaseSync } = require('node:sqlite');
