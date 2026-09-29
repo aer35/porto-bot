@@ -20,7 +20,7 @@ export const units = {
   // dropped to 6, so amounts recorded earlier keep their precision without a migration. Deliberate
   // limit: the largest storable amount is about 90 million coins, where the scaled value passes
   // Number.MAX_SAFE_INTEGER; bigger amounts are rejected.
-  CRYPTO: { scale: 100_000_000, decimals: 6, shown: 3, multiplier: 1 },
+  CRYPTO: { scale: 100_000_000, decimals: 6, shown: 6, multiplier: 1 },
   // Whole contracts only.
   OPTION: { scale: 1, decimals: 0, shown: 0, multiplier: 100 },
 };
@@ -67,7 +67,7 @@ export const value = (type: Holdable, quantity: number, price: number) =>
 export const unitPrice = (type: Holdable, quantity: number, total: number) =>
   (total * units[type].scale) / (quantity * units[type].multiplier);
 
-// A stored quantity for display: 12785 STOCK → "12.785", 123456789 CRYPTO → "1.234".
+// A stored quantity for display: 12785 STOCK → "12.785", 123456789 CRYPTO → "1.234567".
 export function formatQuantity(type: Holdable, quantity: number) {
   const { scale, shown } = units[type];
   const truncated = Math.trunc(quantity / (scale / 10 ** shown)) / 10 ** shown;

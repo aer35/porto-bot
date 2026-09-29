@@ -48,7 +48,7 @@ test('historyLines shows share counts before and after a split', () => {
   assert.match(historyLines(result.history)[2], /\*\*SPLIT\*\* 3:2 of \*\*AAPL\*\* — 5 → 7.5 SHARES\n`XX01` · <t:3:D>/);
 });
 
-test('a crypto transaction shows coins, truncated to 3 decimals, what they cost in total, and the price per coin', () => {
+test('a crypto transaction shows coins, truncated to 6 decimals, what they cost in total, and the price per coin', () => {
   const tx = {
     id: 1, ref: 'BCC01', user_id: 'u', sec_type: 'CRYPTO' as const, side: 'BUY' as const, ticker: 'BTC-USD',
     shares: 123_456_789, price: 100_000, trade_date: 1767268800, created_at: 0, split_from: null, split_to: null,
@@ -56,7 +56,7 @@ test('a crypto transaction shows coins, truncated to 3 decimals, what they cost 
   };
   assert.equal(
     messages.txLine(tx),
-    '**BUY** 1.234 × COINS of **BTC-USD** for $123,456.79\n`BCC01` · $100,000.00 per coin · <t:1767268800:D>',
+    '**BUY** 1.234567 × COINS of **BTC-USD** for $123,456.79\n`BCC01` · $100,000.00 per coin · <t:1767268800:D>',
   );
 });
 

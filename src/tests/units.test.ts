@@ -40,12 +40,14 @@ test('value turns a stored quantity and a per-unit price into dollars, dividing 
   assert.equal(value('CRYPTO', 34_000, 100_000), 34);
 });
 
-test('formatQuantity shows stock to 3 decimals and truncates crypto to 3, never rounding up', () => {
+test('formatQuantity shows stock to 3 decimals and truncates crypto to 6, the most either can be entered with, never rounding up', () => {
   assert.equal(formatQuantity('STOCK', 12_785), '12.785');
   assert.equal(formatQuantity('STOCK', 12_780), '12.78');
   assert.equal(formatQuantity('STOCK', 1_234_567_000), '1,234,567');
-  assert.equal(formatQuantity('CRYPTO', 123_456_789), '1.234');
-  assert.equal(formatQuantity('CRYPTO', 99_999_999), '0.999');
+  assert.equal(formatQuantity('CRYPTO', 34_000), '0.00034');
+  // 8-decimal amounts recorded before the 6-decimal input limit are cut off at 6.
+  assert.equal(formatQuantity('CRYPTO', 123_456_789), '1.234567');
+  assert.equal(formatQuantity('CRYPTO', 99_999_999), '0.999999');
   assert.equal(formatQuantity('CRYPTO', 150_000_000), '1.5');
 });
 
