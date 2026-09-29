@@ -226,6 +226,10 @@ export const messages = {
       `Applied a ${ratio.split_to}:${ratio.split_from} split to **${ticker}** for ${count} ${count === 1 ? 'member' : 'members'}.`,
   },
 
+  // The bot's custom status in the member list: its version, then once checked (see apiUp in
+  // index.ts) whether the price API answers.
+  presence: (version: string, apiUp?: boolean) => `v${version}` + (apiUp === undefined ? '' : ` · API: ${apiUp ? '🟢' : '🔴'}`),
+
   // One holding in /position: position, quantity, average cost, cost basis, and once the nightly
   // job has a price, that price, the current value and the unrealized P/L. If the job tried and
   // failed, "price unavailable" instead; before it has tried, nothing.

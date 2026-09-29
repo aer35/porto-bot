@@ -114,3 +114,9 @@ test('a priced holdings line adds the current price, current value and unrealize
     '**AAPL** · 12.5 SHARES · avg $10.00 · cost $125.00 · price unavailable',
   );
 });
+
+test("the bot's status shows its version, then whether the price API answers once checked", () => {
+  assert.equal(messages.presence('2.5.0'), 'v2.5.0');
+  assert.equal(messages.presence('2.5.0', true), 'v2.5.0 · API: 🟢');
+  assert.equal(messages.presence('2.5.0', false), 'v2.5.0 · API: 🔴');
+});

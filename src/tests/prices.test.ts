@@ -4,7 +4,7 @@ import type { NewTx } from '../components/ledger.js';
 
 // config.ts validates env at import, so set it before loading anything that opens the database.
 Object.assign(process.env, { DISCORD_TOKEN: 't', DISCORD_CLIENT_ID: 'c', DISCORD_GUILD_ID: 'g', DB_PATH: ':memory:' });
-const { dueForPrices, fetchPrices, getPrice, heldSymbols, priceSymbol, RateLimited } = await import('../components/prices.js');
+const { apiUp, dueForPrices, fetchPrices, getPrice, heldSymbols, priceSymbol, RateLimited } = await import('../components/prices.js');
 const { priceOf } = await import('../queries/prices.js');
 const { commitChange } = await import('../components/userLedger.js');
 
@@ -132,4 +132,11 @@ test('a failed fetch counts until a fetch succeeds, but never hides a price that
 
   saveFailure('OLD', now - 49 * 3600);
   assert.deepEqual(priceOf('OLD'), { price: null, failed: false }, 'a failure older than 2 days is forgotten, like a price');
+});
+
+test('apiUp is true only when Yahoo answers with a price, and never throws', async () => {
+  assert.equal(await apiUp(async () => 580.12), true);
+  assert.equal(await apiUp(async () => null), false);
+  assert.equal(await apiUp(async () => { throw new RateLimited(); }), false);
+  assert.equal(await apiUp(async () => { throw new DOMException('timed out', 'TimeoutError'); }), false);
 });

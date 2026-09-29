@@ -60,6 +60,14 @@ export async function getPrice(symbol: string, fetchFn: typeof fetch = fetch, ti
   return typeof price === 'number' && price > 0 ? price : null;
 }
 
+// Whether Yahoo is answering, for the bot's status: asks for SPY, which always trades. False on
+// anything but a price (a timeout, an HTTP error, a 429, no data); never throws.
+export const apiUp = (get = getPrice) =>
+  get('SPY').then(
+    (price) => price !== null,
+    () => false,
+  );
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Waits after a 429 before retrying the same symbol: 30 s, then 60 s, then 120 s, then give up on it.
