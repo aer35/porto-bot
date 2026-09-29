@@ -252,6 +252,10 @@ A few things worth knowing:
   is `SSS01` and `SL01` is `XSS01`.
 - Every sale shows its realized profit or loss (`P/L`), against the average cost at the time of that sale: 🟢 for a gain,
   🔴 for a loss.
+- `/portfolio` and `/position` show each holding's latest price, what it is worth at that price, and its unrealized
+  profit or loss. Prices update once every evening, after 17:00 New York time. A holding with no price yet, or one
+  Yahoo Finance does not know, shows its cost only, and the totals count it at cost. Option values are for the whole
+  contract, 100 times the quoted price.
 - Deleting or amending a transaction will **not** change or remove the message already in the channel.
 - The bot never lets you sell more shares than you own, or edit your history into an impossible state.
 - `/reset` and `/split` are limited to members with the **Manage Server** permission (generally moderators). You can change who may use them in
