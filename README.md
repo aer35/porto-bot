@@ -252,7 +252,7 @@ A few things worth knowing:
   uses `BCC01` and `SCC01`, and options `BOC01`, `BOP01`, `SOC01` and `SOP01` (call or put). That is what you type into `/amend` and `/delete`. IDs from before version 2 gained a letter: `BS01` is now `BSS01`, `SS01`
   is `SSS01` and `SL01` is `XSS01`.
 - Every sale shows its realized profit or loss (`P/L`), against the average cost at the time of that sale: 🟢 for a gain,
-  🔴 for a loss. Each transaction starts with a square for its type: 🟩 stock, 🟦 crypto, 🟥 option.
+  🔴 for a loss.
 - Deleting or amending a transaction will **not** change or remove the message already in the channel.
 - The bot never lets you sell more shares than you own, or edit your history into an impossible state.
 - `/reset` and `/split` are limited to members with the **Manage Server** permission (generally moderators). You can change who may use them in

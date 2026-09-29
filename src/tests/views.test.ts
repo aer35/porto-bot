@@ -106,7 +106,7 @@ test('the transactions tab is yellow, with each transaction its own text display
 test('position shows its holdings and a page of transactions, with page buttons only when there is more than one page', () => {
   const single = positionView('42', 'AAPL', [aapl], ['tx one'], 0, 1);
   assert.equal(single.components.length, 1);
-  assert.match(texts(single).join('\n'), /## AAPL — <@42>[\s\S]*\*\*AAPL\*\* · 12\.5 shares/);
+  assert.match(texts(single).join('\n'), /## AAPL — <@42>[\s\S]*\*\*AAPL\*\* · 12\.5 SHARES/);
 
   const paged = positionView('42', 'AAPL', [], ['tx one'], 1, 3);
   assert.equal(paged.components.length, 2);
