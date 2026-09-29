@@ -42,6 +42,13 @@ test('getPrice is null when Yahoo has no price for the symbol', async () => {
   assert.equal(await getPrice('NOPE', fakeFetch(200, { chart: { result: [{ meta: {} }] } }).fn), null);
 });
 
+test('getPrice gives up on a request Yahoo does not answer in time', async () => {
+  // Never answers; only the abort signal ends the request.
+  const hangs = ((_: unknown, init?: RequestInit) =>
+    new Promise((_, reject) => init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason)))) as typeof fetch;
+  await assert.rejects(getPrice('AAPL', hangs, 50), { name: 'TimeoutError' });
+});
+
 test('getPrice throws RateLimited on HTTP 429', async () => {
   await assert.rejects(getPrice('AAPL', fakeFetch(429, {}).fn), RateLimited);
 });

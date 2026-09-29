@@ -37,9 +37,13 @@ export class RateLimited extends Error {}
 
 // The latest price of one symbol, or null if Yahoo has none (unknown symbol, delisted, or a
 // contract it does not list). The User-Agent matters: Yahoo throttles requests that send none.
-export async function getPrice(symbol: string, fetchFn: typeof fetch = fetch) {
+// Throws a TimeoutError if Yahoo has not answered within timeoutMs, so a hung request cannot stall the job.
+export async function getPrice(symbol: string, fetchFn: typeof fetch = fetch, timeoutMs = 10_000) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
-  const res = await fetchFn(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; porto-bot)' } });
+  const res = await fetchFn(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; porto-bot)' },
+    signal: AbortSignal.timeout(timeoutMs),
+  });
   if (res.status === 429) throw new RateLimited(`Yahoo rate-limited ${symbol}`);
   if (!res.ok) {
     // 404 is Yahoo's answer for a symbol it does not know. Anything else (a block, an outage) is
