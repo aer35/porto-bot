@@ -112,30 +112,35 @@ function newYork(date: Date) {
   return { day: `${part('year')}-${part('month')}-${part('day')}`, hour: Number(part('hour')) };
 }
 
-// Prices are fetched once a day, after 17:00 in New York, so stock prices are that day's close.
-// `lastRun` is unix seconds of the previous run, or null.
-export function dueForPrices(now: Date, lastRun: number | null) {
-  const today = newYork(now);
-  if (today.hour < 17) return false;
-  if (lastRun === null) return true;
-  const last = newYork(new Date(lastRun * 1000));
-  return !(last.day === today.day && last.hour >= 17);
+// The New York day whose close a fetch at `date` sees: that day from 17:00, the day before until then.
+function closeOf(date: Date) {
+  const { day, hour } = newYork(date);
+  return hour >= 17 ? day : new Date(Date.parse(day) - 86_400_000).toISOString().slice(0, 10);
 }
 
-// Checks every hour whether the nightly fetch is due, so a restart catches up the same evening.
-// The last run lives in memory, seeded from the newest stored price.
+// Due when nothing has been fetched since the latest 17:00 in New York, so stock prices are that
+// day's close. That makes a fresh install, or a bot that was down at 17:00, fetch at startup, while
+// a restart the same night does not. `lastRun` is unix seconds of the previous run, or null.
+export const dueForPrices = (now: Date, lastRun: number | null) =>
+  lastRun === null || closeOf(new Date(lastRun * 1000)) !== closeOf(now);
+
+// Checks at startup and then every hour whether the fetch is due. It runs in the background: no
+// command waits on it, and nothing it throws reaches the bot. The last run lives in memory, seeded
+// from the newest stored price.
 export function schedulePrices() {
-  let lastRun = lastFetchedAt();
+  let lastRun: number | null | undefined;
   let running = false;
   const tick = async () => {
-    if (running || !dueForPrices(new Date(), lastRun)) return;
+    if (running) return;
     running = true;
     try {
+      lastRun ??= lastFetchedAt();
+      if (!dueForPrices(new Date(), lastRun)) return;
       await fetchPrices();
-    } catch (err) {
-      console.error(err);
-    } finally {
       lastRun = Math.floor(Date.now() / 1000);
+    } catch (err) {
+      console.error('price job:', err);
+    } finally {
       running = false;
     }
   };

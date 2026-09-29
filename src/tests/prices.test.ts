@@ -86,15 +86,16 @@ test('the price job fetches every distinct held symbol once, one at a time, and 
   assert.ok(pauses.some((ms) => ms >= 30_000), 'backs off after a 429');
 });
 
-test('the price job is due once a day, after 17:00 in New York', () => {
+test('the price job runs at startup unless it already has the latest close, then after each 17:00 in New York', () => {
   const at = (iso: string) => new Date(iso);
-  // 2026-03-10 21:30 UTC is 17:30 in New York (EDT).
-  assert.equal(dueForPrices(at('2026-03-10T21:30:00Z'), null), true);
-  assert.equal(dueForPrices(at('2026-03-10T20:30:00Z'), null), false, 'before 17:00');
-  const earlierToday = Date.parse('2026-03-10T21:05:00Z') / 1000;
-  assert.equal(dueForPrices(at('2026-03-10T23:00:00Z'), earlierToday), false, 'already ran today');
-  const yesterday = Date.parse('2026-03-09T22:00:00Z') / 1000;
-  assert.equal(dueForPrices(at('2026-03-10T21:30:00Z'), yesterday), true);
+  const unix = (iso: string) => Date.parse(iso) / 1000;
+  // In March 2026 New York is UTC-4 from the 8th: 14:00 UTC is 10:00 there, 21:30 UTC is 17:30.
+  assert.equal(dueForPrices(at('2026-03-10T14:00:00Z'), null), true, 'never run: fetch now, whatever the hour');
+  assert.equal(dueForPrices(at('2026-03-10T14:00:00Z'), unix('2026-03-09T21:05:00Z')), false, "has last night's close");
+  assert.equal(dueForPrices(at('2026-03-10T14:00:00Z'), unix('2026-03-08T21:05:00Z')), true, 'missed last night');
+  assert.equal(dueForPrices(at('2026-03-10T21:30:00Z'), unix('2026-03-09T21:05:00Z')), true, "tonight's close");
+  assert.equal(dueForPrices(at('2026-03-10T21:30:00Z'), unix('2026-03-10T14:00:00Z')), true, 'ran this morning, before the close');
+  assert.equal(dueForPrices(at('2026-03-10T23:00:00Z'), unix('2026-03-10T21:05:00Z')), false, 'already ran tonight');
 });
 
 test('withPrices attaches each holding its stored price, or null', async () => {
