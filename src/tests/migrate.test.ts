@@ -159,3 +159,19 @@ test('stock quantities move from hundredths to thousandths; crypto, options and 
 
   assert.deepEqual(db.prepare('SELECT shares FROM transactions ORDER BY id').all().map((r) => r.shares), [12_780, 34_000, 2, null]);
 });
+
+test('a database already migrated by 2.0 gains the prices table', () => {
+  const db = new DatabaseSync(':memory:');
+  // Exactly the migrations 2.0.x shipped. A later file numbered below the last of these would never
+  // run on a live install, since migrate only applies files above PRAGMA user_version.
+  const released = [
+    '001_transactions.sql', '002_transaction_refs.sql', '2026092615_alter_shares_values.sql', '2026092700_ref_prefixes.sql',
+    '2026092701_crypto_prefixes.sql', '2026092702_options.sql', '2026092703_holdings.sql', '2026092800_stock_thousandths.sql',
+  ];
+  migrate(db, dirWith(Object.fromEntries(released.map((f) => [f, readFileSync(join(migrationsDir, f), 'utf8')]))));
+  assert.equal(version(db), 2026092800);
+
+  migrate(db);
+
+  assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'prices'").get());
+});
