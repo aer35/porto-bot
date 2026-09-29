@@ -56,8 +56,11 @@ function signed(n: number) {
   return cents > 0 ? `🟢 +${money(n)}` : cents < 0 ? `🔴 -${money(-n)}` : `⚪ ${money(0)}`;
 }
 
-// "(2 at cost, no price yet)" after a value that counts holdings without a price at their cost.
-const atCost = (t: Totals) => (t.unpriced ? ` (${t.unpriced} at cost, no price yet)` : '');
+// "(2 at cost, no price)" after a value that counts holdings without a price at their cost.
+const atCost = (t: Totals) => (t.unpriced ? ` (${t.unpriced} at cost, no price)` : '');
+
+// What a holding shows where its price would be once fetching it failed (see priceOf).
+const priceUnavailable = ' · price unavailable';
 
 const meta = (tx: Tx, realized?: number | null) =>
   tx.sec_type === 'SPLIT'
@@ -224,14 +227,15 @@ export const messages = {
   },
 
   // One holding in /position: position, quantity, average cost, cost basis, and once the nightly
-  // job has a price, that price, the current value and the unrealized P/L.
+  // job has a price, that price, the current value and the unrealized P/L. If the job tried and
+  // failed, "price unavailable" instead; before it has tried, nothing.
   holdingLine: (p: Holding) =>
     `${holdingLabel(p)} · ${formatQuantity(p.sec_type, p.shares)} ${quantityUnit[p.sec_type]} · ` +
     `avg ${money(p.avgCost)} · cost ${money(value(p.sec_type, p.shares, p.avgCost))}` +
     (p.price != null
       ? ` · price ${money(p.price)} · value ${money(value(p.sec_type, p.shares, p.price))} · ` +
         `P/L ${signed(value(p.sec_type, p.shares, p.price - p.avgCost))}`
-      : ''),
+      : p.priceFailed ? priceUnavailable : ''),
 
   // One holding in a /portfolio tab: the same fields as holdingLine, named once by portfolio.columns
   // (and priceColumns, once priced).
@@ -239,5 +243,5 @@ export const messages = {
     `${holdingLabel(p)} · ${formatQuantity(p.sec_type, p.shares)} · ${money(p.avgCost)} · ${money(value(p.sec_type, p.shares, p.avgCost))}` +
     (p.price != null
       ? ` · ${money(p.price)} · ${money(value(p.sec_type, p.shares, p.price))} · ${signed(value(p.sec_type, p.shares, p.price - p.avgCost))}`
-      : ''),
+      : p.priceFailed ? priceUnavailable : ''),
 };

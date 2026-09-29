@@ -81,8 +81,8 @@ test('the price job fetches every distinct held symbol once, one at a time, and 
 
   assert.deepEqual(asked.toSorted(), ['AAPL', 'BRK-B', 'BTC-USD', 'BTC-USD']);
   assert.deepEqual(result, { fetched: 2, missing: ['BRK-B'] });
-  assert.ok(priceOf('AAPL')! > 100 && priceOf('BTC-USD')! > 100);
-  assert.equal(priceOf('BRK-B'), null);
+  assert.ok(priceOf('AAPL').price! > 100 && priceOf('BTC-USD').price! > 100);
+  assert.deepEqual(priceOf('BRK-B'), { price: null, failed: true }, 'no data from Yahoo is remembered as a failure');
   assert.ok(pauses.some((ms) => ms >= 30_000), 'backs off after a 429');
 });
 
@@ -105,7 +105,7 @@ test('withPrices attaches each holding its stored price, or null', async () => {
     { ...NOT_OPTION, sec_type: 'STOCK', ticker: 'BRK.B', shares: 100, avgCost: 400 },
     { ...NOT_OPTION, sec_type: 'STOCK', ticker: 'ZZZZ', shares: 100, avgCost: 1 },
   ]);
-  assert.deepEqual(priced.map((p) => p.price), [500, null]);
+  assert.deepEqual(priced.map((p) => [p.price, p.priceFailed]), [[500, false], [null, false]]);
 });
 
 test('a price older than 2 days counts as no price, so a stale one is never shown as current', async () => {
@@ -113,6 +113,22 @@ test('a price older than 2 days counts as no price, so a stale one is never show
   const now = Math.floor(Date.now() / 1000);
   savePrice('FRESH', 10, now - 36 * 3600);
   savePrice('STALE', 10, now - 49 * 3600);
-  assert.equal(priceOf('FRESH'), 10);
-  assert.equal(priceOf('STALE'), null);
+  assert.equal(priceOf('FRESH').price, 10);
+  assert.equal(priceOf('STALE').price, null);
+});
+
+test('a failed fetch counts until a fetch succeeds, but never hides a price that is still fresh', async () => {
+  const { savePrice, saveFailure } = await import('../queries/prices.js');
+  const now = Math.floor(Date.now() / 1000);
+  saveFailure('DOWN', now);
+  assert.deepEqual(priceOf('DOWN'), { price: null, failed: true });
+  savePrice('DOWN', 5, now);
+  assert.deepEqual(priceOf('DOWN'), { price: 5, failed: false });
+
+  savePrice('BLIP', 5, now - 36 * 3600);
+  saveFailure('BLIP', now);
+  assert.deepEqual(priceOf('BLIP'), { price: 5, failed: false }, "yesterday's price outlasts one failed night");
+
+  saveFailure('OLD', now - 49 * 3600);
+  assert.deepEqual(priceOf('OLD'), { price: null, failed: false }, 'a failure older than 2 days is forgotten, like a price');
 });

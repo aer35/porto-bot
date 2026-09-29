@@ -109,4 +109,8 @@ test('a priced holdings line adds the current price, current value and unrealize
   const put = { ...aapl, sec_type: 'OPTION' as const, shares: 2, avgCost: 3.2, opt_right: 'PUT' as const, strike: 150, expiry: JAN_16 };
   assert.match(messages.holdingLine({ ...put, price: 1.2 }), / · price \$1\.20 · value \$240\.00 · P\/L 🔴 -\$400\.00$/);
   assert.doesNotMatch(messages.holdingLine({ ...aapl, price: null }), /price/);
+  assert.equal(
+    messages.holdingLine({ ...aapl, price: null, priceFailed: true }),
+    '**AAPL** · 12.5 SHARES · avg $10.00 · cost $125.00 · price unavailable',
+  );
 });

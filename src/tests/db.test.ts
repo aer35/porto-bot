@@ -18,14 +18,14 @@ test('a write waits for another process holding the database, instead of failing
      const { parentPort, workerData } = require('node:worker_threads');
      const db = new DatabaseSync(workerData);
      db.exec('BEGIN IMMEDIATE');
-     db.prepare('INSERT INTO prices VALUES (?, ?, ?)').run('AAPL', 1, 0);
+     db.prepare('INSERT INTO prices (symbol, price, fetched_at) VALUES (?, ?, ?)').run('AAPL', 1, 0);
      parentPort.postMessage('locked');
      setTimeout(() => { db.exec('COMMIT'); db.close(); }, 200);`,
     { eval: true, workerData: path },
   );
   await new Promise((resolve) => other.once('message', resolve));
 
-  db.prepare('INSERT INTO prices VALUES (?, ?, ?)').run('MSFT', 1, 0);
+  db.prepare('INSERT INTO prices (symbol, price, fetched_at) VALUES (?, ?, ?)').run('MSFT', 1, 0);
 
   assert.equal(db.prepare('SELECT count(*) AS n FROM prices').get()!.n, 2);
 });

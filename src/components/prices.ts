@@ -1,4 +1,4 @@
-import { heldPositions, lastFetchedAt, priceOf, savePrice } from '../queries/prices.js';
+import { heldPositions, lastFetchedAt, priceOf, saveFailure, savePrice } from '../queries/prices.js';
 import type { Position } from './ledger.js';
 import { toDateString } from './validate.js';
 
@@ -19,15 +19,19 @@ export function priceSymbol(p: Priced) {
   return `${p.ticker}${yymmdd}${p.opt_right![0]}${strike}`;
 }
 
-// A position with its latest stored price, null until the nightly job has one.
-export type Holding = Position & { price?: number | null };
+// A position with its latest stored price, null until the nightly job has one. priceFailed is true
+// when the job tried and got nothing (see priceOf), so views can say so instead of showing nothing.
+export type Holding = Position & { price?: number | null; priceFailed?: boolean };
 
 // Totals of some holdings: cost basis, value at current prices with holdings that have no price
 // counted at cost (null when none has a price), and how many have no price.
 export type Totals = { cost: number; current: number | null; unpriced: number };
 
 export const withPrices = (positions: Position[]): Holding[] =>
-  positions.map((p) => ({ ...p, price: priceOf(priceSymbol(p)) }));
+  positions.map((p) => {
+    const { price, failed } = priceOf(priceSymbol(p));
+    return { ...p, price, priceFailed: failed };
+  });
 
 // Every symbol some member holds, once each.
 export const heldSymbols = () => [...new Set(heldPositions().map(priceSymbol))];
@@ -61,8 +65,8 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 // Waits after a 429 before retrying the same symbol: 30 s, then 60 s, then 120 s, then give up on it.
 const BACKOFF_MS = [30_000, 60_000, 120_000];
 
-// Fetches every held symbol one at a time, `gapMs` apart, storing each price as it arrives, so a
-// crash halfway keeps what was fetched. Returns how many were stored and which had no price.
+// Fetches every held symbol one at a time, `gapMs` apart, storing each price (or failure) as it
+// arrives, so a crash halfway keeps what was fetched. Returns how many were stored and which had no price.
 export async function fetchPrices(get = getPrice, wait = sleep, gapMs = 1_000) {
   const missing: string[] = [];
   let fetched = 0;
@@ -80,8 +84,10 @@ export async function fetchPrices(get = getPrice, wait = sleep, gapMs = 1_000) {
         await wait(BACKOFF_MS[attempt]);
       }
     }
-    if (price === null) missing.push(symbol);
-    else {
+    if (price === null) {
+      missing.push(symbol);
+      saveFailure(symbol, Math.floor(Date.now() / 1000));
+    } else {
       savePrice(symbol, price, Math.floor(Date.now() / 1000));
       fetched++;
     }

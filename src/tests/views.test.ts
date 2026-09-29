@@ -128,8 +128,11 @@ test('a priced holding adds price, value and P/L to its row, and the totals add 
 
   const partly = texts(portfolioView('42', 'STOCK', [{ ...aapl, price: 12 }, msft, btc], 0)).join('\n');
   assert.match(partly, /\*\*MSFT\*\* · 12\.5 · \$10\.00 · \$125\.00$/m);
-  assert.match(partly, /\*\*Value\*\* \$275\.00 \(1 at cost, no price yet\)/);
-  assert.match(partly, /\$30,250\.00 cost, \$30,275\.00 value \(2 at cost, no price yet\)$/m);
+  assert.match(partly, /\*\*Value\*\* \$275\.00 \(1 at cost, no price\)/);
+  assert.match(partly, /\$30,250\.00 cost, \$30,275\.00 value \(2 at cost, no price\)$/m);
+
+  const failed = texts(portfolioView('42', 'STOCK', [{ ...aapl, price: null, priceFailed: true }], 0)).join('\n');
+  assert.match(failed, /-# Ticker · Shares · Avg cost · Cost basis\n\*\*AAPL\*\* · 12\.5 · \$10\.00 · \$125\.00 · price unavailable$/m);
 
   const position = texts(positionView('42', 'AAPL', [{ ...aapl, price: 12 }], ['tx'], 0, 1)).join('\n');
   assert.match(position, /price \$12\.00 · value \$150\.00 · P\/L 🟢 \+\$25\.00/);
