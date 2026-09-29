@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, type ButtonInteraction, type ChatInputCommandInteraction } from 'discord.js';
 import { historyLines } from '../components/historyLines.js';
+import { withPrices } from '../components/prices.js';
 import { PAGE_SIZE, portfolioView, TABS, transactionsView, type Tab } from '../components/views.js';
 import { historyPage, holdingsOf } from '../queries/holdings.js';
 import { messages } from '../strings/messages.js';
@@ -10,7 +11,7 @@ export const data = new SlashCommandBuilder()
   .addUserOption((o) => o.setName('user').setDescription(messages.options.user));
 
 function render(userId: string, tab: Tab, requested: number) {
-  if (tab !== 'TX') return portfolioView(userId, tab, holdingsOf(userId), requested);
+  if (tab !== 'TX') return portfolioView(userId, tab, withPrices(holdingsOf(userId)), requested);
   const { rows, page, pageCount } = historyPage(userId, null, PAGE_SIZE, requested);
   return transactionsView(userId, historyLines(rows), page, pageCount);
 }

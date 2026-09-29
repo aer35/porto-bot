@@ -186,3 +186,13 @@ test('/sell option suggests the expiries held as MM/DD/YY, marking any that have
   // With no ticker typed yet, every held contract is a candidate, each listed once.
   assert.deepEqual(contractChoices(held, 'expiry', '', none, NOW).map((c) => c.value), ['01/16/26', '06/19/26', '09/18/26']);
 });
+
+test('every /buy and /sell ticker option names Yahoo Finance as the ticker source, within Discord\'s 100 characters', () => {
+  for (const side of ['BUY', 'SELL'] as const) {
+    for (const sub of trade(side).data.toJSON().options as { name: string; options: { name: string; description: string }[] }[]) {
+      const { description } = sub.options.find((o) => o.name === 'ticker')!;
+      assert.match(description, /Yahoo Finance/, `${side} ${sub.name}`);
+      assert.ok(description.length <= 100, description);
+    }
+  }
+});

@@ -9,7 +9,7 @@ import {
   TextDisplayBuilder,
 } from 'discord.js';
 import { messages } from '../strings/messages.js';
-import type { Position } from './ledger.js';
+import type { Holding, Totals } from './prices.js';
 import { pageButtons } from './pageButtons.js';
 import { value, type Holdable } from './units.js';
 
@@ -40,11 +40,20 @@ function addTransactions(container: ContainerBuilder, lines: string[]) {
   });
 }
 
-const costOf = (positions: Position[]) => positions.reduce((sum, p) => sum + value(p.sec_type, p.shares, p.avgCost), 0);
-const totalLine = (positions: Position[]) => messages.portfolio.total(costOf(positions));
+// What some holdings cost, and what they are worth at current prices with any holding that has no
+// price yet counted at cost. current is null when none of them has a price.
+function totals(holdings: Holding[]): Totals {
+  const sum = (amount: (h: Holding) => number) => holdings.reduce((total, h) => total + amount(h), 0);
+  const cost = (h: Holding) => value(h.sec_type, h.shares, h.avgCost);
+  const unpriced = holdings.filter((h) => h.price == null).length;
+  const current =
+    unpriced === holdings.length ? null : sum((h) => (h.price == null ? cost(h) : value(h.sec_type, h.shares, h.price)));
+  return { cost: sum(cost), current, unpriced };
+}
+const totalLine = (holdings: Holding[]) => messages.portfolio.total(totals(holdings));
 
 // One line per holding, then the total cost basis across all of them.
-const holdingsText = (positions: Position[], empty: string) =>
+const holdingsText = (positions: Holding[], empty: string) =>
   positions.length ? [...positions.map(messages.holdingLine), totalLine(positions)].join('\n') : empty;
 
 // /portfolio is one tab at a time: a holdings tab per security type, then every transaction.
@@ -82,7 +91,7 @@ function portfolioFrame(userId: string, tab: Tab, body: (c: ContainerBuilder) =>
 // A holdings tab: the field label row, one page of that type's holdings, then the tab's cost basis
 // beside the total of every holding. `positions` is every holding, sorted by ticker; `page` is
 // clamped, since holdings may have changed since a button was sent.
-export function portfolioView(userId: string, tab: Holdable, positions: Position[], page: number) {
+export function portfolioView(userId: string, tab: Holdable, positions: Holding[], page: number) {
   const held = positions.filter((p) => p.sec_type === tab);
   const pageCount = Math.max(1, Math.ceil(held.length / PAGE_SIZE));
   page = Math.min(Math.max(page, 0), pageCount - 1);
@@ -94,7 +103,13 @@ export function portfolioView(userId: string, tab: Holdable, positions: Position
       c.addTextDisplayComponents(
         text(
           held.length
-            ? [messages.portfolio.columns[tab], ...rows, '', messages.portfolio.tabTotal(costOf(held), costOf(positions))].join('\n')
+            ? [
+                // Price, value and P/L only get named once the nightly job has priced something here.
+                messages.portfolio.columns[tab] + (held.some((p) => p.price != null) ? messages.portfolio.priceColumns : ''),
+                ...rows,
+                '',
+                messages.portfolio.tabTotal(totals(held), totals(positions)),
+              ].join('\n')
             : messages.portfolio.empty[tab],
         ),
       ),
@@ -115,7 +130,7 @@ export function transactionsView(userId: string, lines: string[], page: number, 
 }
 
 // One page of a ticker's transactions (already cut to the page), under the holdings for that ticker.
-export function positionView(userId: string, ticker: string, held: Position[], lines: string[], page: number, pageCount: number) {
+export function positionView(userId: string, ticker: string, held: Holding[], lines: string[], page: number, pageCount: number) {
   const container = new ContainerBuilder()
     .addTextDisplayComponents(
       text(messages.position.title(userId, ticker)),

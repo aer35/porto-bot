@@ -115,7 +115,7 @@ const types: Record<string, SecurityType> = {
     sec_type: 'STOCK',
     options: (sub, side) =>
       priceOption(
-        tickerOption(sub, side, 'STOCK', messages.options.ticker).addNumberOption((o) =>
+        tickerOption(sub, side, 'STOCK', messages.options.stockTicker).addNumberOption((o) =>
           o.setName('shares').setDescription(messages.options.shares).setRequired(true).setMinValue(10 ** -units.STOCK.decimals),
         ),
         'price',

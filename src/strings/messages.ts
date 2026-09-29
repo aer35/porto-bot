@@ -1,5 +1,6 @@
 import { date, money } from '../components/format.js';
-import type { Position, Tx } from '../components/ledger.js';
+import type { Tx } from '../components/ledger.js';
+import type { Holding, Totals } from '../components/prices.js';
 import { formatQuantity, value, type Holdable } from '../components/units.js';
 import { shortDate, toDateString } from '../components/validate.js';
 
@@ -38,7 +39,7 @@ const expired = (p: Contract) =>
   p.sec_type === 'OPTION' && toDateString(p.expiry!) < toDateString(Date.now() / 1000) ? ' (expired)' : '';
 
 // A holding's name in bold, then the expired mark if any.
-const holdingLabel = (p: Position) => `**${positionLabel(p)}**${expired(p)}`;
+const holdingLabel = (p: Holding) => `**${positionLabel(p)}**${expired(p)}`;
 
 const action = (tx: Tx, counts?: [number, number]) =>
   tx.sec_type === 'SPLIT'
@@ -54,6 +55,12 @@ function signed(n: number) {
   const cents = Math.round(n * 100);
   return cents > 0 ? `🟢 +${money(n)}` : cents < 0 ? `🔴 -${money(-n)}` : `⚪ ${money(0)}`;
 }
+
+// "(2 at cost, no price)" after a value that counts holdings without a price at their cost.
+const atCost = (t: Totals) => (t.unpriced ? ` (${t.unpriced} at cost, no price)` : '');
+
+// What a holding shows where its price would be once fetching it failed (see priceOf).
+const priceUnavailable = ' · price unavailable';
 
 const meta = (tx: Tx, realized?: number | null) =>
   tx.sec_type === 'SPLIT'
@@ -86,14 +93,18 @@ export const messages = {
 
   options: {
     ticker: 'Ticker symbol, e.g. AAPL',
+    // /buy and /sell ticker captions name where prices come from (see Price data in CLAUDE.md), so a
+    // mistyped ticker is the member's to notice: the bot only checks a ticker's format. Yahoo writes
+    // share classes with a dash; the bot takes a dot and converts it.
+    stockTicker: 'Ticker as on Yahoo Finance, e.g. AAPL. Write share classes with a dot: BRK.B',
     shares: 'Number of shares, up to 3 decimals, e.g. 12.785',
     price: 'Price per share',
     anyTicker: 'Ticker symbol, e.g. AAPL or BTC-USD',
-    cryptoTicker: 'Coin and currency, e.g. BTC-USD. BTC alone means BTC-USD',
+    cryptoTicker: 'Coin and currency as on Yahoo Finance, e.g. BTC-USD. BTC alone means BTC-USD',
     amount: 'Number of coins, up to 6 decimals, e.g. 0.00034',
     totalPaid: 'What you paid in total, in USD, e.g. 100',
     totalReceived: 'What you received in total, in USD, e.g. 100. Can be 0',
-    optionTicker: 'Ticker of the underlying stock, e.g. AAPL',
+    optionTicker: 'Underlying stock ticker as on Yahoo Finance, e.g. AAPL',
     type: 'Call or put',
     strike: 'Strike price per share, e.g. 150',
     expiry: 'Expiry as MM/DD/YY, or MM/DD for this year. For a buy, today or later',
@@ -147,9 +158,17 @@ export const messages = {
       OPTION: '-# Contract · Contracts · Avg price · Cost basis',
     },
     empty: { STOCK: 'No stock holdings.', CRYPTO: 'No crypto holdings.', OPTION: 'No option holdings.' },
-    // /position's single total; /portfolio shows the open tab's cost beside the total of every holding.
-    total: (cost: number) => `**Total cost basis** ${money(cost)}`,
-    tabTotal: (tabCost: number, allCost: number) => `**Cost basis** ${money(tabCost)} · **Total, all holdings** ${money(allCost)}`,
+    // Added to a tab's label row once some holding in it has a price (see holdingRow).
+    priceColumns: ' · Price · Value · P/L',
+    // /position's single total; /portfolio shows the open tab's totals beside those of every holding.
+    // Value appears once some holding has a price, with the rest counted at cost.
+    total: (t: Totals) =>
+      `**Total cost basis** ${money(t.cost)}` + (t.current === null ? '' : ` · **value** ${money(t.current)}${atCost(t)}`),
+    tabTotal: (tab: Totals, all: Totals) =>
+      `**Cost basis** ${money(tab.cost)}` +
+      (tab.current === null ? '' : ` · **Value** ${money(tab.current)}${atCost(tab)}`) +
+      ` · **Total, all holdings** ${money(all.cost)}` +
+      (all.current === null ? '' : ` cost, ${money(all.current)} value${atCost(all)}`),
     noTransactions: 'No transactions yet.',
   },
 
@@ -207,12 +226,26 @@ export const messages = {
       `Applied a ${ratio.split_to}:${ratio.split_from} split to **${ticker}** for ${count} ${count === 1 ? 'member' : 'members'}.`,
   },
 
-  // One holding in /position: position, quantity, average cost, cost basis.
-  holdingLine: (p: Position) =>
-    `${holdingLabel(p)} · ${formatQuantity(p.sec_type, p.shares)} ${quantityUnit[p.sec_type]} · ` +
-    `avg ${money(p.avgCost)} · cost ${money(value(p.sec_type, p.shares, p.avgCost))}`,
+  // The bot's custom status in the member list: its version, then once checked (see apiUp in
+  // index.ts) whether the price API answers.
+  presence: (version: string, apiUp?: boolean) => `v${version}` + (apiUp === undefined ? '' : ` · API: ${apiUp ? '🟢' : '🔴'}`),
 
-  // One holding in a /portfolio tab: the same fields as holdingLine, named once by portfolio.columns.
-  holdingRow: (p: Position) =>
-    `${holdingLabel(p)} · ${formatQuantity(p.sec_type, p.shares)} · ${money(p.avgCost)} · ${money(value(p.sec_type, p.shares, p.avgCost))}`,
+  // One holding in /position: position, quantity, average cost, cost basis, and once the nightly
+  // job has a price, that price, the current value and the unrealized P/L. If the job tried and
+  // failed, "price unavailable" instead; before it has tried, nothing.
+  holdingLine: (p: Holding) =>
+    `${holdingLabel(p)} · ${formatQuantity(p.sec_type, p.shares)} ${quantityUnit[p.sec_type]} · ` +
+    `avg ${money(p.avgCost)} · cost ${money(value(p.sec_type, p.shares, p.avgCost))}` +
+    (p.price != null
+      ? ` · price ${money(p.price)} · value ${money(value(p.sec_type, p.shares, p.price))} · ` +
+        `P/L ${signed(value(p.sec_type, p.shares, p.price - p.avgCost))}`
+      : p.priceFailed ? priceUnavailable : ''),
+
+  // One holding in a /portfolio tab: the same fields as holdingLine, named once by portfolio.columns
+  // (and priceColumns, once priced).
+  holdingRow: (p: Holding) =>
+    `${holdingLabel(p)} · ${formatQuantity(p.sec_type, p.shares)} · ${money(p.avgCost)} · ${money(value(p.sec_type, p.shares, p.avgCost))}` +
+    (p.price != null
+      ? ` · ${money(p.price)} · ${money(value(p.sec_type, p.shares, p.price))} · ${signed(value(p.sec_type, p.shares, p.price - p.avgCost))}`
+      : p.priceFailed ? priceUnavailable : ''),
 };
