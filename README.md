@@ -255,7 +255,7 @@ A few things worth knowing:
   🔴 for a loss.
 - `/portfolio` and `/position` show each holding's latest price, what it is worth at that price, and its unrealized
   profit or loss (see [Price data](#price-data)). A holding the bot has not priced yet shows its cost only. One it
-  could not get a price for says `price unavailable`. Both are counted at cost in the totals. Option values are for
+  could not get a price for says `price unavailable` in `/position`, and shows `-` as its price in `/portfolio`. Both are counted at cost in the totals. Option values are for
   the whole contract, 100 times the quoted price.
 - Deleting or amending a transaction will **not** change or remove the message already in the channel.
 - The bot never lets you sell more shares than you own, or edit your history into an impossible state.
