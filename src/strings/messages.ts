@@ -49,11 +49,34 @@ const action = (tx: Tx, counts?: [number, number]) =>
       // Crypto is bought for a total ("0.5 BTC for $30,000"); the price per coin goes on the next line.
       (tx.sec_type === 'CRYPTO' ? `for ${money(value(tx.sec_type, tx.shares!, tx.price!))}` : `@ ${money(tx.price!)}`);
 
-// P/L with a coloured dot and its sign, e.g. "🟢 +$150.00", "🔴 -$0.50", or "⚪ $0.00" when it
-// rounds to nothing. Compared in cents, so a P/L of a fraction of a cent never shows "🔴 -$0.00".
-function signed(n: number) {
+// P/L as its signed amount and coloured dot, e.g. ["+$150.00", "🟢"], ["-$0.50", "🔴"], or
+// ["$0.00", "⚪"] when it rounds to nothing. Compared in cents, so a P/L of a fraction of a cent
+// never shows "-$0.00".
+function plParts(n: number) {
   const cents = Math.round(n * 100);
-  return cents > 0 ? `🟢 +${money(n)}` : cents < 0 ? `🔴 -${money(-n)}` : `⚪ ${money(0)}`;
+  return cents > 0 ? [`+${money(n)}`, '🟢'] : cents < 0 ? [`-${money(-n)}`, '🔴'] : [money(0), '⚪'];
+}
+
+// P/L in running text, dot first: "🟢 +$150.00".
+function signed(n: number) {
+  const [amount, dot] = plParts(n);
+  return `${dot} ${amount}`;
+}
+
+// One holding's cells in a /portfolio table, in portfolio.columns order, and the P/L dot that
+// follows the row. With `priced`, three more cells: price, value and P/L, left blank before the
+// first fetch, or "unavailable" in the price cell once one has failed.
+function holdingCells(p: Holding, priced: boolean) {
+  const cells = [
+    `${positionLabel(p)}${expired(p)}`,
+    formatQuantity(p.sec_type, p.shares),
+    money(p.avgCost),
+    money(value(p.sec_type, p.shares, p.avgCost)),
+  ];
+  if (!priced) return { cells, dot: '' };
+  if (p.price == null) return { cells: [...cells, p.priceFailed ? 'unavailable' : '', '', ''], dot: '' };
+  const [amount, dot] = plParts(value(p.sec_type, p.shares, p.price - p.avgCost));
+  return { cells: [...cells, money(p.price), money(value(p.sec_type, p.shares, p.price)), amount], dot };
 }
 
 // "(2 at cost, no price)" after a value that counts holdings without a price at their cost.
@@ -151,16 +174,15 @@ export const messages = {
     title: (userId: string) => `## Portfolio of <@${userId}>`,
     // Tab button labels, also the heading above the open tab.
     tabs: { STOCK: 'Stocks', CRYPTO: 'Crypto', OPTION: 'Options', TX: 'Transactions' },
-    // The field label row above a holdings tab's rows, naming each field of holdingRow in order,
-    // with the same | between them.
+    // The column headings of a holdings tab's table (holdingsTable), before any price columns.
     columns: {
-      STOCK: '-# Ticker | Shares | Avg cost | Cost basis',
-      CRYPTO: '-# Coin | Coins | Avg cost | Cost basis',
-      OPTION: '-# Contract | Contracts | Avg price | Cost basis',
+      STOCK: ['Ticker', 'Shares', 'Avg cost', 'Cost basis'],
+      CRYPTO: ['Coin', 'Coins', 'Avg cost', 'Cost basis'],
+      OPTION: ['Contract', 'Contracts', 'Avg price', 'Cost basis'],
     },
     empty: { STOCK: 'No stock holdings.', CRYPTO: 'No crypto holdings.', OPTION: 'No option holdings.' },
-    // Added to a tab's label row once some holding in it has a price (see holdingRow).
-    priceColumns: ' | Price | Value | P/L',
+    // Added to the table once some holding in it has a price or a failed fetch.
+    priceColumns: ['Price', 'Value', 'P/L'],
     // /position's single total; /portfolio shows the open tab's totals beside those of every holding.
     // Value appears once some holding has a price, with the rest counted at cost.
     total: (t: Totals) =>
@@ -242,17 +264,20 @@ export const messages = {
         `P/L ${signed(value(p.sec_type, p.shares, p.price - p.avgCost))}`
       : p.priceFailed ? ` · ${priceUnavailable}` : ''),
 
-  // One holding in a /portfolio tab: the same fields as holdingLine, named once by portfolio.columns
-  // (and priceColumns, once priced). Columns are split by | rather than holdingLine's ·, which ran
-  // the numbers together; Discord has no tables, and its font is not monospaced, so they cannot align.
-  holdingRow: (p: Holding) =>
-    [
-      holdingLabel(p),
-      formatQuantity(p.sec_type, p.shares),
-      money(p.avgCost),
-      money(value(p.sec_type, p.shares, p.avgCost)),
-      ...(p.price != null
-        ? [money(p.price), money(value(p.sec_type, p.shares, p.price)), signed(value(p.sec_type, p.shares, p.price - p.avgCost))]
-        : p.priceFailed ? [priceUnavailable] : []),
-    ].join(' | '),
+  // A page of a /portfolio holdings tab as a table: the same fields as holdingLine, one column each.
+  // Discord has no tables and its text font is not monospaced, so it is a code block, which is.
+  // Each column is as wide as its widest cell on this page (no fixed maximum), two spaces apart,
+  // the first left-aligned and the numbers right-aligned. Code blocks show ** literally, so names
+  // are not bold. The P/L's dot follows the row with no space or heading: an emoji is about two
+  // letters wide, so anywhere but the end of the line it would push the columns after it out of line.
+  holdingsTable: (tab: Holdable, holdings: Holding[]) => {
+    const priced = holdings.some((p) => p.price != null || p.priceFailed);
+    const headings = [...messages.portfolio.columns[tab], ...(priced ? messages.portfolio.priceColumns : [])];
+    const rows = holdings.map((p) => holdingCells(p, priced));
+    const widths = headings.map((h, i) => Math.max(h.length, ...rows.map((r) => r.cells[i].length)));
+    const line = (cells: string[]) =>
+      cells.map((c, i) => (i === 0 ? c.padEnd(widths[i]) : c.padStart(widths[i]))).join('  ').trimEnd();
+    const rule = widths.map((w) => '─'.repeat(w)).join('  ');
+    return ['```', line(headings), rule, ...rows.map((r) => line(r.cells) + r.dot), '```'].join('\n');
+  },
 };

@@ -88,14 +88,14 @@ function portfolioFrame(userId: string, tab: Tab, body: (c: ContainerBuilder) =>
   return view([container, ...rows]);
 }
 
-// A holdings tab: the field label row, one page of that type's holdings, then the tab's cost basis
+// A holdings tab: a table of one page of that type's holdings, then the tab's cost basis
 // beside the total of every holding. `positions` is every holding, sorted by ticker; `page` is
 // clamped, since holdings may have changed since a button was sent.
 export function portfolioView(userId: string, tab: Holdable, positions: Holding[], page: number) {
   const held = positions.filter((p) => p.sec_type === tab);
   const pageCount = Math.max(1, Math.ceil(held.length / PAGE_SIZE));
   page = Math.min(Math.max(page, 0), pageCount - 1);
-  const rows = held.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map(messages.holdingRow);
+  const shown = held.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   return portfolioFrame(
     userId,
     tab,
@@ -103,13 +103,7 @@ export function portfolioView(userId: string, tab: Holdable, positions: Holding[
       c.addTextDisplayComponents(
         text(
           held.length
-            ? [
-                // Price, value and P/L only get named once the nightly job has priced something here.
-                messages.portfolio.columns[tab] + (held.some((p) => p.price != null) ? messages.portfolio.priceColumns : ''),
-                ...rows,
-                '',
-                messages.portfolio.tabTotal(totals(held), totals(positions)),
-              ].join('\n')
+            ? [messages.holdingsTable(tab, shown), '', messages.portfolio.tabTotal(totals(held), totals(positions))].join('\n')
             : messages.portfolio.empty[tab],
         ),
       ),

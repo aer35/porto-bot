@@ -20,6 +20,8 @@ function children(view: View) {
 }
 const texts = (view: View) =>
   children(view).filter(([type]) => type === ComponentType.TextDisplay).map(([, text]) => text!);
+// The lines of a holdings tab's table, from inside its code block.
+const table = (view: View) => texts(view).join('\n').match(/```\n([\s\S]*?)\n```/)![1].split('\n');
 
 
 // The buttons of every action row after the container, as [custom_id, label, style, disabled].
@@ -31,26 +33,42 @@ const buttons = (view: View) =>
 const call: Position = { sec_type: 'OPTION', ticker: 'AAPL', shares: 1, avgCost: 2, opt_right: 'CALL', strike: 150, expiry: 1_800_000_000 };
 const msft: Position = { ...aapl, ticker: 'MSFT' };
 
-test('portfolio renders one tab as components, never pings, with a field label row, rows, and tab and overall cost', () => {
+test('portfolio renders one tab as components, never pings, with a table of holdings, and tab and overall cost', () => {
   const view = portfolioView('42', 'STOCK', [call, aapl, btc, msft], 0);
   assert.equal(view.flags, MessageFlags.IsComponentsV2);
   assert.deepEqual(view.allowedMentions, { parse: [] });
   assert.equal(json(view)[0].accent_color, Colors.Green);
   const all = texts(view).join('\n');
   assert.match(all, /## Portfolio of <@42>\n### Stocks/);
-  assert.match(all, /-# Ticker \| Shares \| Avg cost \| Cost basis\n\*\*AAPL\*\* \| 12\.5 \| \$10\.00 \| \$125\.00\n\*\*MSFT\*\*/);
-  assert.match(all, /\*\*Cost basis\*\* \$250\.00 · \*\*Total, all holdings\*\* \$30,450\.00/);
-  assert.doesNotMatch(all, /BTC-USD|CALL|```/);
+  // Discord has no tables, so it is a monospaced code block: each column as wide as its widest
+  // cell, text left-aligned, numbers right-aligned.
+  assert.deepEqual(table(view), [
+    'Ticker  Shares  Avg cost  Cost basis',
+    '──────  ──────  ────────  ──────────',
+    'AAPL      12.5    $10.00     $125.00',
+    'MSFT      12.5    $10.00     $125.00',
+  ]);
+  assert.match(all, /```\n\n\*\*Cost basis\*\* \$250\.00 · \*\*Total, all holdings\*\* \$30,450\.00/);
+  assert.doesNotMatch(all, /BTC-USD|CALL/);
 });
 
-test('each holdings tab has its own colour, label row and rows, and an empty tab says so', () => {
+test('each holdings tab has its own colour and table columns, and an empty tab says so', () => {
   const crypto = portfolioView('42', 'CRYPTO', [call, aapl, btc], 0);
   assert.equal(json(crypto)[0].accent_color, Colors.Blue);
-  assert.match(texts(crypto).join('\n'), /### Crypto\n-# Coin \| Coins \| Avg cost \| Cost basis\n\*\*BTC-USD\*\* \| 0\.5 \| \$60,000\.00 \| \$30,000\.00/);
+  assert.match(texts(crypto).join('\n'), /### Crypto\n```/);
+  assert.deepEqual(table(crypto), [
+    'Coin     Coins    Avg cost  Cost basis',
+    '───────  ─────  ──────────  ──────────',
+    'BTC-USD    0.5  $60,000.00  $30,000.00',
+  ]);
 
   const options = portfolioView('42', 'OPTION', [call, aapl, btc], 0);
   assert.equal(json(options)[0].accent_color, Colors.Red);
-  assert.match(texts(options).join('\n'), /### Options\n-# Contract \| Contracts \| Avg price \| Cost basis\n\*\*AAPL CALL \$150\.00 01\/15\/27\*\* \| 1 \| \$2\.00 \| \$200\.00/);
+  assert.deepEqual(table(options), [
+    'Contract                    Contracts  Avg price  Cost basis',
+    '──────────────────────────  ─────────  ─────────  ──────────',
+    'AAPL CALL $150.00 01/15/27          1      $2.00     $200.00',
+  ]);
 
   const empty = texts(portfolioView('42', 'CRYPTO', [aapl], 0)).join('\n');
   assert.match(empty, /No crypto holdings\./);
@@ -71,7 +89,8 @@ test('the tab buttons switch tabs, the open tab is highlighted, and no two butto
 test('a holdings tab shows 10 rows a page, with page buttons only when there is more than one page', () => {
   const stocks = Array.from({ length: 12 }, (_, i): Position => ({ ...aapl, ticker: `T${String(i).padStart(2, '0')}` }));
   const first = portfolioView('42', 'STOCK', stocks, 0);
-  const rows = (view: View) => texts(view).join('\n').match(/\*\*T\d\d\*\*/g) ?? [];
+  // The ticker of each table row, after the heading and rule lines.
+  const rows = (view: View) => table(view).slice(2).map((line) => line.split(' ')[0]);
   assert.equal(rows(first).length, 10);
   assert.match(texts(first).join('\n'), /Page 1 of 2/);
   const ids = buttons(first).map(([id]) => id);
@@ -79,7 +98,7 @@ test('a holdings tab shows 10 rows a page, with page buttons only when there is 
   assert.deepEqual(buttons(first).slice(4).map(([id, , , disabled]) => [id, disabled]), [['portfolio:STOCK:-1:42', true], ['portfolio:STOCK:1:42', false]]);
 
   const pastTheEnd = portfolioView('42', 'STOCK', stocks, 9);
-  assert.deepEqual(rows(pastTheEnd), ['**T10**', '**T11**']);
+  assert.deepEqual(rows(pastTheEnd), ['T10', 'T11']);
   assert.match(texts(pastTheEnd).join('\n'), /Page 2 of 2/);
 
   assert.equal(buttons(portfolioView('42', 'STOCK', stocks.slice(0, 10), 0)).length, 4);
@@ -123,16 +142,24 @@ test('position shows its holdings and a page of transactions, with page buttons 
 
 test('a priced holding adds price, value and P/L to its row, and the totals add value, counting unpriced holdings at cost', () => {
   const priced = texts(portfolioView('42', 'STOCK', [{ ...aapl, price: 12 }, { ...btc, price: 70_000 }], 0)).join('\n');
-  assert.match(priced, /-# Ticker \| Shares \| Avg cost \| Cost basis \| Price \| Value \| P\/L\n\*\*AAPL\*\* \| 12\.5 \| \$10\.00 \| \$125\.00 \| \$12\.00 \| \$150\.00 \| 🟢 \+\$25\.00/);
+  // The P/L's dot rides unlabelled at the very end, where its double width can't misalign anything.
+  assert.deepEqual(table(portfolioView('42', 'STOCK', [{ ...aapl, price: 12 }], 0)), [
+    'Ticker  Shares  Avg cost  Cost basis   Price    Value      P/L',
+    '──────  ──────  ────────  ──────────  ──────  ───────  ───────',
+    'AAPL      12.5    $10.00     $125.00  $12.00  $150.00  +$25.00🟢',
+  ]);
   assert.match(priced, /\*\*Cost basis\*\* \$125\.00 · \*\*Value\*\* \$150\.00 · \*\*Total, all holdings\*\* \$30,125\.00 cost, \$35,150\.00 value$/m);
 
   const partly = texts(portfolioView('42', 'STOCK', [{ ...aapl, price: 12 }, msft, btc], 0)).join('\n');
-  assert.match(partly, /\*\*MSFT\*\* \| 12\.5 \| \$10\.00 \| \$125\.00$/m);
+  assert.equal(table(portfolioView('42', 'STOCK', [{ ...aapl, price: 12 }, msft], 0))[3], 'MSFT      12.5    $10.00     $125.00', 'not fetched yet: blank');
   assert.match(partly, /\*\*Value\*\* \$275\.00 \(1 at cost, no price\)/);
   assert.match(partly, /\$30,250\.00 cost, \$30,275\.00 value \(2 at cost, no price\)$/m);
 
-  const failed = texts(portfolioView('42', 'STOCK', [{ ...aapl, price: null, priceFailed: true }], 0)).join('\n');
-  assert.match(failed, /-# Ticker \| Shares \| Avg cost \| Cost basis\n\*\*AAPL\*\* \| 12\.5 \| \$10\.00 \| \$125\.00 \| price unavailable$/m);
+  assert.deepEqual(table(portfolioView('42', 'STOCK', [{ ...aapl, price: null, priceFailed: true }], 0)), [
+    'Ticker  Shares  Avg cost  Cost basis        Price  Value  P/L',
+    '──────  ──────  ────────  ──────────  ───────────  ─────  ───',
+    'AAPL      12.5    $10.00     $125.00  unavailable',
+  ]);
 
   const position = texts(positionView('42', 'AAPL', [{ ...aapl, price: 12 }], ['tx'], 0, 1)).join('\n');
   assert.match(position, /price \$12\.00 · value \$150\.00 · P\/L 🟢 \+\$25\.00/);
