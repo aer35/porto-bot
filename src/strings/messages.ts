@@ -65,11 +65,11 @@ function signed(n: number) {
 
 // One holding's cells in a /portfolio table, in portfolio.columns order, and the P/L dot that
 // follows the row. With `priced`, three more cells: price, value and P/L, left blank before the
-// first fetch, or "-" in the price cell once one has failed.
+// first fetch, or each "-" once one has failed.
 function holdingCells(p: Holding, priced: boolean) {
   const cells = [`${positionLabel(p)}${expired(p)}`, formatQuantity(p.sec_type, p.shares)];
   if (!priced) return { cells, dot: '' };
-  if (p.price == null) return { cells: [...cells, p.priceFailed ? '-' : '', '', ''], dot: '' };
+  if (p.price == null) return { cells: [...cells, ...Array(3).fill(p.priceFailed ? NO_PRICE : '')], dot: '' };
   const [amount, dot] = plParts(value(p.sec_type, p.shares, p.price - p.avgCost));
   return { cells: [...cells, money(p.price), money(value(p.sec_type, p.shares, p.price)), amount], dot };
 }
@@ -77,8 +77,9 @@ function holdingCells(p: Holding, priced: boolean) {
 // "(2 at cost, no price)" after a value that counts holdings without a price at their cost.
 const atCost = (t: Totals) => (t.unpriced ? ` (${t.unpriced} at cost, no price)` : '');
 
-// What a holding shows where its price would be once fetching it failed (see priceOf).
-const priceUnavailable = 'price unavailable';
+// What a holding shows for each of its price, value and P/L once fetching its price failed (see
+// priceOf), in /position and /portfolio alike. Before the first fetch they are left out instead.
+const NO_PRICE = '-';
 
 const meta = (tx: Tx, realized?: number | null) =>
   tx.sec_type === 'SPLIT'
@@ -253,14 +254,14 @@ export const messages = {
 
   // One holding in /position: position, quantity, average cost, cost basis, and once the nightly
   // job has a price, that price, the current value and the unrealized P/L. If the job tried and
-  // failed, "price unavailable" instead; before it has tried, nothing.
+  // failed, each of those is "-"; before it has tried, they are left out.
   holdingLine: (p: Holding) =>
     `${holdingLabel(p)} · ${formatQuantity(p.sec_type, p.shares)} ${quantityUnit[p.sec_type]} · ` +
     `avg ${money(p.avgCost)} · cost ${money(value(p.sec_type, p.shares, p.avgCost))}` +
     (p.price != null
       ? ` · price ${money(p.price)} · value ${money(value(p.sec_type, p.shares, p.price))} · ` +
         `P/L ${signed(value(p.sec_type, p.shares, p.price - p.avgCost))}`
-      : p.priceFailed ? ` · ${priceUnavailable}` : ''),
+      : p.priceFailed ? ` · price ${NO_PRICE} · value ${NO_PRICE} · P/L ${NO_PRICE}` : ''),
 
   // A page of a /portfolio holdings tab as a table: holdingLine's fields but average cost and cost
   // basis (see portfolio.columns), one column each.

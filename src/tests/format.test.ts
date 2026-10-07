@@ -111,7 +111,7 @@ test('a priced holdings line adds the current price, current value and unrealize
   assert.doesNotMatch(messages.holdingLine({ ...aapl, price: null }), /price/);
   assert.equal(
     messages.holdingLine({ ...aapl, price: null, priceFailed: true }),
-    '**AAPL** · 12.5 SHARES · avg $10.00 · cost $125.00 · price unavailable',
+    '**AAPL** · 12.5 SHARES · avg $10.00 · cost $125.00 · price - · value - · P/L -',
   );
 });
 

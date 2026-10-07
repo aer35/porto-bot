@@ -158,7 +158,7 @@ test('a priced holding adds price, value and P/L to its row, and the totals add 
   assert.deepEqual(table(portfolioView('42', 'STOCK', [{ ...aapl, price: null, priceFailed: true }], 0)), [
     'Ticker  Shares  Price  Value  P/L',
     '──────  ──────  ─────  ─────  ───',
-    'AAPL      12.5      -',
+    'AAPL      12.5      -      -    -',
   ]);
 
   const position = texts(positionView('42', 'AAPL', [{ ...aapl, price: 12 }], ['tx'], 0, 1)).join('\n');
