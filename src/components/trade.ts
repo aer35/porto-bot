@@ -21,6 +21,7 @@ import {
   parseCryptoTicker,
   parseDate,
   parseExpiry,
+  parseOptionType,
   parseShortDate,
   parseTicker,
   shortDate,
@@ -163,7 +164,7 @@ const types: Record<string, SecurityType> = {
               .setName('type')
               .setDescription(messages.options.type)
               .setRequired(true)
-              .addChoices({ name: 'Call', value: 'CALL' }, { name: 'Put', value: 'PUT' }),
+              .setAutocomplete(true),
           ),
           'strike',
           messages.options.strike,
@@ -189,9 +190,8 @@ const types: Record<string, SecurityType> = {
       ),
     read(options, side, tz, now) {
       const ticker = readTicker(options, 'OPTION');
-      // Discord only offers the two choices, but a stale client could still send anything.
-      const opt_right = options.getString('type', true);
-      if (opt_right !== 'CALL' && opt_right !== 'PUT') throw new UserError(messages.invalidOptionType);
+      const opt_right = parseOptionType(options.getString('type', true));
+      if (!opt_right) throw new UserError(messages.invalidOptionType);
       const strike = readPrice(options, 'strike', messages.invalidStrike);
       // Only a buy opens a position, so only a buy needs a contract that has not expired. A sell must
       // match a contract already held (replay rejects anything else), and may close one after expiry.
@@ -205,6 +205,15 @@ const types: Record<string, SecurityType> = {
   },
 };
 
+// The option type's suggestions, narrowed by what has been typed, in any case. Suggested rather
+// than a fixed Discord choice list, which the client only accepts exactly as listed, so a typed-out
+// "call" still reaches parseOptionType.
+const OPTION_TYPES = [
+  { name: 'Call', value: 'CALL' },
+  { name: 'Put', value: 'PUT' },
+];
+export const optionTypeChoices = (typed: string) => OPTION_TYPES.filter((c) => c.value.startsWith(typed.trim().toUpperCase()));
+
 // /sell option's suggestions for the focused strike or expiry: those of the option contracts held,
 // narrowed by the ticker, type and strike already picked (each ignored while empty or invalid) and by
 // what has been typed so far. An expiry that has passed is still offered, marked, since it may
@@ -217,8 +226,9 @@ export function contractChoices(
   now = new Date(),
 ) {
   const ticker = picked.ticker && parseTicker(picked.ticker);
+  const type = picked.type && parseOptionType(picked.type);
   const matching = held.filter(
-    (p) => (!ticker || p.ticker === ticker) && (!picked.type || p.opt_right === picked.type) && (picked.strike == null || p.strike === picked.strike),
+    (p) => (!ticker || p.ticker === ticker) && (!type || p.opt_right === type) && (picked.strike == null || p.strike === picked.strike),
   );
   const today = toDateString(now.getTime() / 1000);
   const choices =
@@ -264,11 +274,12 @@ export function trade(side: Side) {
     });
   }
 
-  // Only /sell autocompletes, from what the user holds of that subcommand's type: the ticker, and
-  // for an option also the strike and expiry of the contracts held.
+  // Both sides suggest an option's type. /sell also suggests from what the user holds of that
+  // subcommand's type: the ticker, and for an option the strike and expiry of the contracts held.
   async function autocomplete(interaction: AutocompleteInteraction) {
     const userId = interaction.user.id;
     const { name, value } = interaction.options.getFocused(true);
+    if (name === 'type') return interaction.respond(optionTypeChoices(String(value)));
     if (name !== 'strike' && name !== 'expiry') {
       return tickerAutocomplete(interaction, userId, types[interaction.options.getSubcommand()].sec_type);
     }

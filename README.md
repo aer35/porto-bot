@@ -230,7 +230,7 @@ What the options mean:
 | `shares` | Number of shares, like `10.555`. Fractional shares are supported, up to 3 decimal places |
 | `amount` | Number of coins, like `0.00034`, up to 6 decimal places                                 |
 | `total`  | Crypto only: what you paid or received in total, in USD, like `100`. `amount:0.00001 total:100` means 0.00001 coins for $100, and the bot works out the price per coin. A sale can be `0` |
-| `type`   | Options only: `Call` or `Put`                                                           |
+| `type`   | Options only: `Call` or `Put`, in any case (`call` works too)                           |
 | `strike` | Options only: the strike price per share, like `150`                                    |
 | `expiry` | Options only: the expiry date as `MM/DD/YY`, or `MM/DD` for this year, like `12/24`. When buying, today or later. `/sell option` suggests the strikes and expiries you hold |
 | `contracts` | Options only: number of contracts, a whole number                                    |

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 // config.ts validates env at import, so set it before loading anything that opens the database.
 Object.assign(process.env, { DISCORD_TOKEN: 't', DISCORD_CLIENT_ID: 'c', DISCORD_GUILD_ID: 'g', DB_PATH: ':memory:' });
-const { contractChoices, trade, tradeRow } = await import('../components/trade.js');
+const { contractChoices, optionTypeChoices, trade, tradeRow } = await import('../components/trade.js');
 const { UserError } = await import('../components/userError.js');
 
 // Stands in for interaction.options: the values a user typed, by option name.
@@ -99,7 +99,8 @@ test('/buy and /sell each have an option subcommand', () => {
       options: { name: string; choices?: { value: string }[]; autocomplete?: boolean }[];
     };
     assert.deepEqual(option.options.map((o) => o.name), ['ticker', 'type', 'strike', 'expiry', 'contracts', 'price', 'date']);
-    assert.deepEqual(option.options[1].choices!.map((c) => c.value), ['CALL', 'PUT']);
+    // Suggested rather than a fixed choice list, which Discord would only accept exactly as listed.
+    assert.deepEqual([option.options[1].choices, option.options[1].autocomplete], [undefined, true]);
     // /sell suggests the strikes and expiries of contracts held; /buy has nothing to suggest.
     assert.deepEqual([option.options[2].autocomplete ?? false, option.options[3].autocomplete ?? false], [side === 'SELL', side === 'SELL']);
   }
@@ -112,6 +113,20 @@ test('an option trade reads into an OPTION row with whole contracts and an expir
     [row.sec_type, row.ticker, row.opt_right, row.strike, row.expiry, row.shares, row.price],
     ['OPTION', 'AAPL', 'CALL', 150, Date.parse('2026-06-19T12:00:00Z') / 1000, 2, 3.2],
   );
+});
+
+test('the option type ignores case and surrounding spaces', () => {
+  const values = { ticker: 'AAPL', strike: 150, expiry: '06/19', contracts: 1, price: 1 };
+  for (const [type, stored] of [['call', 'CALL'], ['Call', 'CALL'], ['CALL', 'CALL'], [' put ', 'PUT'], ['Put', 'PUT'], ['PUT', 'PUT']]) {
+    assert.equal(tradeRow('u', 'BUY', 'option', typed({ ...values, type }), 'UTC', NOW).opt_right, stored, type);
+  }
+});
+
+test('the option type suggests Call and Put, matching what is typed in either case', () => {
+  assert.deepEqual(optionTypeChoices(''), [{ name: 'Call', value: 'CALL' }, { name: 'Put', value: 'PUT' }]);
+  assert.deepEqual(optionTypeChoices('c').map((c) => c.name), ['Call']);
+  assert.deepEqual(optionTypeChoices(' PU').map((c) => c.name), ['Put']);
+  assert.deepEqual(optionTypeChoices('x'), []);
 });
 
 test('invalid option input is a UserError', () => {
@@ -171,6 +186,7 @@ test('/sell option suggests the strikes held, narrowed by the ticker and type al
     { name: '$160.00', value: 160 },
   ]);
   assert.deepEqual(contractChoices(held, 'strike', '', { ...none, ticker: 'AAPL', type: 'CALL' }, NOW).map((c) => c.value), [150, 160]);
+  assert.deepEqual(contractChoices(held, 'strike', '', { ...none, ticker: 'AAPL', type: 'call' }, NOW).map((c) => c.value), [150, 160]);
   assert.deepEqual(contractChoices(held, 'strike', '16', { ...none, ticker: 'AAPL' }, NOW).map((c) => c.value), [160]);
 });
 
@@ -182,6 +198,7 @@ test('/sell option suggests the expiries held as MM/DD/YY, marking any that have
   assert.deepEqual(contractChoices(held, 'expiry', '', { ...none, ticker: 'AAPL', type: 'PUT' }, NOW), [
     { name: '01/16/26 (expired)', value: '01/16/26' },
   ]);
+  assert.deepEqual(contractChoices(held, 'expiry', '', { ...none, ticker: 'AAPL', type: ' put' }, NOW).map((c) => c.value), ['01/16/26']);
   assert.deepEqual(contractChoices(held, 'expiry', '09', { ...none, ticker: 'AAPL' }, NOW).map((c) => c.value), ['09/18/26']);
   // With no ticker typed yet, every held contract is a candidate, each listed once.
   assert.deepEqual(contractChoices(held, 'expiry', '', none, NOW).map((c) => c.value), ['01/16/26', '06/19/26', '09/18/26']);
@@ -195,4 +212,9 @@ test('every /buy and /sell ticker option names Yahoo Finance as the ticker sourc
       assert.ok(description.length <= 100, description);
     }
   }
+});
+
+test('/buy answers autocomplete too, for the option type', async () => {
+  const buy = await import('../commands/buy.js');
+  assert.equal(typeof buy.autocomplete, 'function');
 });
