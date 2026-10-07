@@ -65,11 +65,11 @@ function signed(n: number) {
 
 // One holding's cells in a /portfolio table, in portfolio.columns order, and the P/L dot that
 // follows the row. With `priced`, three more cells: price, value and P/L, left blank before the
-// first fetch, or "unavailable" in the price cell once one has failed.
+// first fetch, or "-" in the price cell once one has failed.
 function holdingCells(p: Holding, priced: boolean) {
   const cells = [`${positionLabel(p)}${expired(p)}`, formatQuantity(p.sec_type, p.shares)];
   if (!priced) return { cells, dot: '' };
-  if (p.price == null) return { cells: [...cells, p.priceFailed ? 'unavailable' : '', '', ''], dot: '' };
+  if (p.price == null) return { cells: [...cells, p.priceFailed ? '-' : '', '', ''], dot: '' };
   const [amount, dot] = plParts(value(p.sec_type, p.shares, p.price - p.avgCost));
   return { cells: [...cells, money(p.price), money(value(p.sec_type, p.shares, p.price)), amount], dot };
 }
@@ -175,7 +175,8 @@ export const messages = {
     columns: {
       STOCK: ['Ticker', 'Shares'],
       CRYPTO: ['Coin', 'Coins'],
-      OPTION: ['Contract', 'Contracts'],
+      // "#" because "Contracts" was far wider than the counts under it.
+      OPTION: ['Contract', '#'],
     },
     empty: { STOCK: 'No stock holdings.', CRYPTO: 'No crypto holdings.', OPTION: 'No option holdings.' },
     // Added to the table once some holding in it has a price or a failed fetch.

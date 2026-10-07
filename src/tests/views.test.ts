@@ -65,9 +65,9 @@ test('each holdings tab has its own colour and table columns, and an empty tab s
   const options = portfolioView('42', 'OPTION', [call, aapl, btc], 0);
   assert.equal(json(options)[0].accent_color, Colors.Red);
   assert.deepEqual(table(options), [
-    'Contract                    Contracts',
-    '──────────────────────────  ─────────',
-    'AAPL CALL $150.00 01/15/27          1',
+    'Contract                    #',
+    '──────────────────────────  ─',
+    'AAPL CALL $150.00 01/15/27  1',
   ]);
 
   const empty = texts(portfolioView('42', 'CRYPTO', [aapl], 0)).join('\n');
@@ -156,9 +156,9 @@ test('a priced holding adds price, value and P/L to its row, and the totals add 
   assert.match(partly, /\$30,250\.00 cost, \$30,275\.00 value \(2 at cost, no price\)$/m);
 
   assert.deepEqual(table(portfolioView('42', 'STOCK', [{ ...aapl, price: null, priceFailed: true }], 0)), [
-    'Ticker  Shares        Price  Value  P/L',
-    '──────  ──────  ───────────  ─────  ───',
-    'AAPL      12.5  unavailable',
+    'Ticker  Shares  Price  Value  P/L',
+    '──────  ──────  ─────  ─────  ───',
+    'AAPL      12.5      -',
   ]);
 
   const position = texts(positionView('42', 'AAPL', [{ ...aapl, price: 12 }], ['tx'], 0, 1)).join('\n');
