@@ -128,7 +128,7 @@ export function positionView(userId: string, ticker: string, held: Holding[], li
   const container = new ContainerBuilder()
     .addTextDisplayComponents(
       text(messages.position.title(userId, ticker)),
-      text(holdingsText(held, messages.position.noShares)),
+      text(holdingsText(held, messages.position.nothingHeld)),
     )
     .addSeparatorComponents((s) => s.setDivider(true).setSpacing(SeparatorSpacingSize.Large))
     .addTextDisplayComponents(text(messages.position.transactions));

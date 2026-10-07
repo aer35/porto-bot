@@ -195,9 +195,10 @@ export const messages = {
   },
 
   position: {
-    description: 'Show every transaction for one ticker, with IDs for /amend and /delete',
+    description: "Show one ticker's holdings, options included, and its transactions, with IDs for /amend and /delete",
     none: (userId: string, ticker: string) => `<@${userId}> has no **${ticker}** transactions.`,
-    noShares: 'No shares held.',
+    // A ticker may be held as shares or as option contracts, so not "No shares held".
+    nothingHeld: 'Nothing held.',
     title: (userId: string, ticker: string) => `## ${ticker} — <@${userId}>`,
     transactions: '### Transactions',
   },

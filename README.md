@@ -215,7 +215,7 @@ Wherever this README shows a `docker compose run --rm porto-bot node dist/...` c
 | `/buy option`         | Record option contracts you bought               | `ticker`, `type`, `strike`, `expiry`, `contracts`, `price` | `date` |
 | `/sell option`        | Record option contracts you sold                 | `ticker`, `type`, `strike`, `expiry`, `contracts`, `price` | `date` |
 | `/portfolio`          | Show holdings and transactions, one tab per type | —                           | `user`   |
-| `/position`           | Show every transaction for one ticker            | `ticker`                    | `user`   |
+| `/position`           | Show your holdings and transactions for one ticker, options included | `ticker`                    | `user`   |
 | `/amend`              | Fix a transaction you entered wrong              | `id`                        | —        |
 | `/delete`             | Remove a transaction                             | `id`                        | —        |
 | `/clear`              | Remove all of your transactions for one ticker   | `ticker`                    | —        |

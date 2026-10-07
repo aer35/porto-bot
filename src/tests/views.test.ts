@@ -130,7 +130,7 @@ test('position shows its holdings and a page of transactions, with page buttons 
   const paged = positionView('42', 'AAPL', [], ['tx one'], 1, 3);
   assert.equal(paged.components.length, 2);
   const all = texts(paged).join('\n');
-  assert.match(all, /No shares held\./);
+  assert.match(all, /Nothing held\./);
   assert.match(all, /Page 2 of 3/);
   const buttons = paged.components[1].toJSON() as { components: { custom_id: string; disabled: boolean }[] };
   assert.deepEqual(
