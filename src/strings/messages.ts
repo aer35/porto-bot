@@ -67,22 +67,16 @@ function signed(n: number) {
 // when Yahoo gave no previous close. Only called once the holding has a price.
 const dayMove = (p: Holding) => (p.prevClose == null ? NO_PRICE : plParts(p.price! - p.prevClose)[0]);
 
-// One holding's cells in a /portfolio table, in portfolio.columns order, and with `priced` the cells
-// of the line under them and the dot that ends it. A priced holding's first line adds price and
-// value. The line under it holds the day's move under the price, and under the value what that move
-// gained or lost on the whole holding, with the dot coloured by that day's result (the overall P/L
-// is in /position). Without a previous close both day figures are "-" and there is no dot. Before
-// the first fetch the price and value are blank and there is no second line; once a fetch has
-// failed, all four are "-".
-function holdingCells(p: Holding, priced: boolean) {
+// One holding's cells in a /portfolio table, in portfolio.columns order then price and value, the
+// cells of the line under them, and the dot that ends that line. Under the price goes the day's
+// move, and under the value what that move gained or lost on the whole holding, with the dot
+// coloured by that day's result (the overall P/L is in /position). Without a previous close both
+// day figures are "-" and there is no dot; without a price (not fetched yet, or the fetch failed),
+// all four are.
+function holdingCells(p: Holding) {
   const cells = [`${positionLabel(p)}${expired(p)}`, formatQuantity(p.sec_type, p.shares)];
   const blank = cells.map(() => '');
-  if (!priced) return { cells, under: null, dot: '' };
-  if (p.price == null) {
-    return p.priceFailed
-      ? { cells: [...cells, NO_PRICE, NO_PRICE], under: [...blank, NO_PRICE, NO_PRICE], dot: '' }
-      : { cells: [...cells, '', ''], under: null, dot: '' };
-  }
+  if (p.price == null) return { cells: [...cells, NO_PRICE, NO_PRICE], under: [...blank, NO_PRICE, NO_PRICE], dot: '' };
   const [amount, dot] = p.prevClose == null ? [NO_PRICE, ''] : plParts(value(p.sec_type, p.shares, p.price - p.prevClose));
   return {
     cells: [...cells, money(p.price), money(value(p.sec_type, p.shares, p.price))],
@@ -197,8 +191,8 @@ export const messages = {
       OPTION: ['Contract', '#'],
     },
     empty: { STOCK: 'No stock holdings.', CRYPTO: 'No crypto holdings.', OPTION: 'No option holdings.' },
-    // Added to the table once some holding in it has a price or a failed fetch. What a priced holding
-    // shows under them, the day's move and gain or loss, has no heading of its own.
+    // After those, on every holdings table. What a holding shows under them, the day's move and gain
+    // or loss, has no heading of its own.
     priceColumns: ['Price', 'Value'],
     // /position's single total; /portfolio shows the open tab's totals beside those of every holding.
     // Value appears once some holding has a price, with the rest counted at cost.
@@ -288,16 +282,15 @@ export const messages = {
   // Discord has no tables and its text font is not monospaced, so it is a code block, which is.
   // Each column is as wide as its widest cell on this page (no fixed maximum), two spaces apart,
   // the first left-aligned and the numbers right-aligned. Code blocks show ** literally, so names
-  // are not bold. A priced holding takes two lines, its day under its price and value (see
+  // are not bold. Each holding takes two lines, its day under its price and value (see
   // holdingCells), so no line carries every column (six in a row wrapped in Discord). The dot ends the
   // second line with no space or heading: an emoji is about two letters wide, so anywhere but the end
   // of a line it would push what comes after it out of line.
   holdingsTable: (tab: Holdable, holdings: Holding[]) => {
-    const priced = holdings.some((p) => p.price != null || p.priceFailed);
-    const headings = [...messages.portfolio.columns[tab], ...(priced ? messages.portfolio.priceColumns : [])];
-    const rows = holdings.map((p) => holdingCells(p, priced));
+    const headings = [...messages.portfolio.columns[tab], ...messages.portfolio.priceColumns];
+    const rows = holdings.map(holdingCells);
     // Every line in the table, as cells; each column is as wide as its widest cell on any of them.
-    const lines = [headings, ...rows.flatMap((r) => [r.cells, ...(r.under ? [r.under] : [])])];
+    const lines = [headings, ...rows.flatMap((r) => [r.cells, r.under])];
     const widths = headings.map((_, i) => Math.max(...lines.map((cells) => cells[i].length)));
     const line = (cells: string[]) =>
       cells.map((c, i) => (i === 0 ? c.padEnd(widths[i]) : c.padStart(widths[i]))).join('  ').trimEnd();
@@ -306,7 +299,7 @@ export const messages = {
       '```',
       line(headings),
       rule,
-      ...rows.flatMap((r) => [line(r.cells), ...(r.under ? [line(r.under) + r.dot] : [])]),
+      ...rows.flatMap((r) => [line(r.cells), line(r.under) + r.dot]),
       '```',
     ].join('\n');
   },
