@@ -84,7 +84,7 @@ test('an option holdings line names the contract and multiplies the cost basis b
 test('an option held past its expiry stays in holdings, marked expired', () => {
   const put = { sec_type: 'OPTION' as const, ticker: 'AAPL', shares: 2, avgCost: 3.2, opt_right: 'PUT' as const, strike: 150, expiry: JAN_16 };
   assert.equal(messages.holdingLine(put), '**AAPL PUT $150.00 01/16/26** (expired) · 2 CONTRACTS · avg $3.20 · cost $640.00');
-  assert.match(messages.holdingsTable('OPTION', [put]), /\nAAPL PUT \$150\.00 01\/16\/26 \(expired\)  +2      \$3\.20     \$640\.00\n/);
+  assert.match(messages.holdingsTable('OPTION', [put]), /\nAAPL PUT \$150\.00 01\/16\/26 \(expired\)  +2\n/);
 });
 
 test('a sell shows its realized P/L when known, signed, after a green or red dot (white at break-even)', () => {
