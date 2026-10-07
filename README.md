@@ -253,7 +253,7 @@ A few things worth knowing:
   is `SSS01` and `SL01` is `XSS01`.
 - Every sale shows its realized profit or loss (`P/L`), against the average cost at the time of that sale: 🟢 for a gain,
   🔴 for a loss.
-- `/portfolio` and `/position` show each holding's latest price, what it is worth at that price, and its unrealized
+- `/portfolio` and `/position` show each holding's latest price, how much that price moved on the day (`Day`), what it is worth at that price, and its unrealized
   profit or loss (see [Price data](#price-data)). A holding the bot has not priced yet shows its cost only. One it
   could not get a price for shows `-` for its price, value and P/L. Both are counted at cost in the totals. Option values are for
   the whole contract, 100 times the quoted price.

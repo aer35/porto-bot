@@ -160,6 +160,15 @@ test('stock quantities move from hundredths to thousandths; crypto, options and 
   assert.deepEqual(db.prepare('SELECT shares FROM transactions ORDER BY id').all().map((r) => r.shares), [12_780, 34_000, 2, null]);
 });
 
+test('a database with the first prices table gains its previous-close column', () => {
+  const db = new DatabaseSync(':memory:');
+  const upToPrices = readdirSync(migrationsDir).filter((f) => /^\d+_/.test(f) && parseInt(f, 10) <= 2026092900);
+  migrate(db, dirWith(Object.fromEntries(upToPrices.map((f) => [f, readFileSync(join(migrationsDir, f), 'utf8')]))));
+  migrate(db);
+  const columns = db.prepare('SELECT name FROM pragma_table_info(?)').all('prices').map((r) => r.name);
+  assert.deepEqual(columns, ['symbol', 'price', 'fetched_at', 'failed_at', 'prev_close']);
+});
+
 test('a database already migrated by 2.0 gains the prices table', () => {
   const db = new DatabaseSync(':memory:');
   // Exactly the migrations 2.0.x shipped. A later file numbered below the last of these would never

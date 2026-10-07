@@ -19,9 +19,10 @@ export function priceSymbol(p: Priced) {
   return `${p.ticker}${yymmdd}${p.opt_right![0]}${strike}`;
 }
 
-// A position with its latest stored price, null until the nightly job has one. priceFailed is true
-// when the job tried and got nothing (see priceOf), so views can say so instead of showing nothing.
-export type Holding = Position & { price?: number | null; priceFailed?: boolean };
+// A position with its latest stored price and the previous close fetched with it, null until the
+// nightly job has them. priceFailed is true when the job tried and got nothing (see priceOf), so
+// views can say so instead of showing nothing.
+export type Holding = Position & { price?: number | null; prevClose?: number | null; priceFailed?: boolean };
 
 // Totals of some holdings: cost basis, value at current prices with holdings that have no price
 // counted at cost (null when none has a price), and how many have no price.
@@ -29,8 +30,8 @@ export type Totals = { cost: number; current: number | null; unpriced: number };
 
 export const withPrices = (positions: Position[]): Holding[] =>
   positions.map((p) => {
-    const { price, failed } = priceOf(priceSymbol(p));
-    return { ...p, price, priceFailed: failed };
+    const { price, prevClose, failed } = priceOf(priceSymbol(p));
+    return { ...p, price, prevClose, priceFailed: failed };
   });
 
 // Every symbol some member holds, once each.
@@ -39,8 +40,9 @@ export const heldSymbols = () => [...new Set(heldPositions().map(priceSymbol))];
 // Yahoo answers HTTP 429 when it throttles; the job backs off and retries on this.
 export class RateLimited extends Error {}
 
-// The latest price of one symbol, or null if Yahoo has none (unknown symbol, delisted, or a
-// contract it does not list). The User-Agent matters: Yahoo throttles requests that send none.
+// The latest price of one symbol and the previous session's close (null if Yahoo gives none), or
+// null if Yahoo has no price (unknown symbol, delisted, or a contract it does not list). The
+// User-Agent matters: Yahoo throttles requests that send none.
 // Throws a TimeoutError if Yahoo has not answered within timeoutMs, so a hung request cannot stall the job.
 export async function getPrice(symbol: string, fetchFn: typeof fetch = fetch, timeoutMs = 10_000) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
@@ -55,16 +57,19 @@ export async function getPrice(symbol: string, fetchFn: typeof fetch = fetch, ti
     if (res.status !== 404) console.error(`price ${symbol}: HTTP ${res.status} from Yahoo`);
     return null;
   }
-  const body = (await res.json()) as { chart?: { result?: { meta?: { regularMarketPrice?: number } }[] | null } };
-  const price = body.chart?.result?.[0]?.meta?.regularMarketPrice;
-  return typeof price === 'number' && price > 0 ? price : null;
+  type Meta = { regularMarketPrice?: number; chartPreviousClose?: number };
+  const body = (await res.json()) as { chart?: { result?: { meta?: Meta }[] | null } };
+  const meta = body.chart?.result?.[0]?.meta;
+  const valid = (n: unknown) => (typeof n === 'number' && n > 0 ? n : null);
+  const price = valid(meta?.regularMarketPrice);
+  return price === null ? null : { price, prevClose: valid(meta?.chartPreviousClose) };
 }
 
 // Whether Yahoo is answering, for the bot's status: asks for SPY, which always trades. False on
 // anything but a price (a timeout, an HTTP error, a 429, no data); never throws.
 export const apiUp = (get = getPrice) =>
   get('SPY').then(
-    (price) => price !== null,
+    (quote) => quote !== null,
     () => false,
   );
 
@@ -79,10 +84,10 @@ export async function fetchPrices(get = getPrice, wait = sleep, gapMs = 1_000) {
   const missing: string[] = [];
   let fetched = 0;
   for (const symbol of heldSymbols()) {
-    let price: number | null = null;
+    let quote: Awaited<ReturnType<typeof getPrice>> = null;
     for (let attempt = 0; ; attempt++) {
       try {
-        price = await get(symbol);
+        quote = await get(symbol);
         break;
       } catch (err) {
         if (!(err instanceof RateLimited) || attempt === BACKOFF_MS.length) {
@@ -92,11 +97,11 @@ export async function fetchPrices(get = getPrice, wait = sleep, gapMs = 1_000) {
         await wait(BACKOFF_MS[attempt]);
       }
     }
-    if (price === null) {
+    if (quote === null) {
       missing.push(symbol);
       saveFailure(symbol, Math.floor(Date.now() / 1000));
     } else {
-      savePrice(symbol, price, Math.floor(Date.now() / 1000));
+      savePrice(symbol, quote.price, quote.prevClose, Math.floor(Date.now() / 1000));
       fetched++;
     }
     await wait(gapMs);

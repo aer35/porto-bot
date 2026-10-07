@@ -30,11 +30,15 @@ function fakeFetch(status: number, body: unknown) {
   return { fn: fn as typeof fetch, calls };
 }
 
-test('getPrice reads regularMarketPrice from the chart endpoint', async () => {
-  const { fn, calls } = fakeFetch(200, { chart: { result: [{ meta: { regularMarketPrice: 187.44 } }], error: null } });
-  assert.equal(await getPrice('BRK-B', fn), 187.44);
+test('getPrice reads the price and the previous close from the chart endpoint', async () => {
+  const { fn, calls } = fakeFetch(200, { chart: { result: [{ meta: { regularMarketPrice: 187.44, chartPreviousClose: 185 } }], error: null } });
+  assert.deepEqual(await getPrice('BRK-B', fn), { price: 187.44, prevClose: 185 });
   assert.equal(calls[0].url, 'https://query1.finance.yahoo.com/v8/finance/chart/BRK-B?range=1d&interval=1d');
   assert.ok(calls[0].headers['User-Agent'], 'sends a User-Agent, which Yahoo expects');
+});
+
+test('getPrice keeps a price that comes without a previous close', async () => {
+  assert.deepEqual(await getPrice('NEW', fakeFetch(200, { chart: { result: [{ meta: { regularMarketPrice: 3 } }] } }).fn), { price: 3, prevClose: null });
 });
 
 test('getPrice is null when Yahoo has no price for the symbol', async () => {
@@ -75,14 +79,15 @@ test('the price job fetches every distinct held symbol once, one at a time, and 
       limited = true;
       throw new RateLimited();
     }
-    return symbol === 'BRK-B' ? null : 100 + asked.length;
+    return symbol === 'BRK-B' ? null : { price: 100 + asked.length, prevClose: 99 };
   };
   const result = await fetchPrices(fakeGetPrice, async (ms) => void pauses.push(ms), 1_000);
 
   assert.deepEqual(asked.toSorted(), ['AAPL', 'BRK-B', 'BTC-USD', 'BTC-USD']);
   assert.deepEqual(result, { fetched: 2, missing: ['BRK-B'] });
   assert.ok(priceOf('AAPL').price! > 100 && priceOf('BTC-USD').price! > 100);
-  assert.deepEqual(priceOf('BRK-B'), { price: null, failed: true }, 'no data from Yahoo is remembered as a failure');
+  assert.equal(priceOf('AAPL').prevClose, 99);
+  assert.deepEqual(priceOf('BRK-B'), { price: null, prevClose: null, failed: true }, 'no data from Yahoo is remembered as a failure');
   assert.ok(pauses.some((ms) => ms >= 30_000), 'backs off after a 429');
 });
 
@@ -101,19 +106,19 @@ test('the price job runs at startup unless it already has the latest close, then
 test('withPrices attaches each holding its stored price, or null', async () => {
   const { withPrices } = await import('../components/prices.js');
   const { savePrice } = await import('../queries/prices.js');
-  savePrice('BRK-B', 500, Math.floor(Date.now() / 1000));
+  savePrice('BRK-B', 500, 490, Math.floor(Date.now() / 1000));
   const priced = withPrices([
     { ...NOT_OPTION, sec_type: 'STOCK', ticker: 'BRK.B', shares: 100, avgCost: 400 },
     { ...NOT_OPTION, sec_type: 'STOCK', ticker: 'ZZZZ', shares: 100, avgCost: 1 },
   ]);
-  assert.deepEqual(priced.map((p) => [p.price, p.priceFailed]), [[500, false], [null, false]]);
+  assert.deepEqual(priced.map((p) => [p.price, p.prevClose, p.priceFailed]), [[500, 490, false], [null, null, false]]);
 });
 
 test('a price older than 2 days counts as no price, so a stale one is never shown as current', async () => {
   const { savePrice } = await import('../queries/prices.js');
   const now = Math.floor(Date.now() / 1000);
-  savePrice('FRESH', 10, now - 36 * 3600);
-  savePrice('STALE', 10, now - 49 * 3600);
+  savePrice('FRESH', 10, 9, now - 36 * 3600);
+  savePrice('STALE', 10, 9, now - 49 * 3600);
   assert.equal(priceOf('FRESH').price, 10);
   assert.equal(priceOf('STALE').price, null);
 });
@@ -122,20 +127,20 @@ test('a failed fetch counts until a fetch succeeds, but never hides a price that
   const { savePrice, saveFailure } = await import('../queries/prices.js');
   const now = Math.floor(Date.now() / 1000);
   saveFailure('DOWN', now);
-  assert.deepEqual(priceOf('DOWN'), { price: null, failed: true });
-  savePrice('DOWN', 5, now);
-  assert.deepEqual(priceOf('DOWN'), { price: 5, failed: false });
+  assert.deepEqual(priceOf('DOWN'), { price: null, prevClose: null, failed: true });
+  savePrice('DOWN', 5, 4, now);
+  assert.deepEqual(priceOf('DOWN'), { price: 5, prevClose: 4, failed: false });
 
-  savePrice('BLIP', 5, now - 36 * 3600);
+  savePrice('BLIP', 5, 4, now - 36 * 3600);
   saveFailure('BLIP', now);
-  assert.deepEqual(priceOf('BLIP'), { price: 5, failed: false }, "yesterday's price outlasts one failed night");
+  assert.deepEqual(priceOf('BLIP'), { price: 5, prevClose: 4, failed: false }, "yesterday's price outlasts one failed night");
 
   saveFailure('OLD', now - 49 * 3600);
-  assert.deepEqual(priceOf('OLD'), { price: null, failed: false }, 'a failure older than 2 days is forgotten, like a price');
+  assert.deepEqual(priceOf('OLD'), { price: null, prevClose: null, failed: false }, 'a failure older than 2 days is forgotten, like a price');
 });
 
 test('apiUp is true only when Yahoo answers with a price, and never throws', async () => {
-  assert.equal(await apiUp(async () => 580.12), true);
+  assert.equal(await apiUp(async () => ({ price: 580.12, prevClose: 579 })), true);
   assert.equal(await apiUp(async () => null), false);
   assert.equal(await apiUp(async () => { throw new RateLimited(); }), false);
   assert.equal(await apiUp(async () => { throw new DOMException('timed out', 'TimeoutError'); }), false);

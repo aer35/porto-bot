@@ -63,21 +63,25 @@ function signed(n: number) {
   return `${dot} ${amount}`;
 }
 
+// A holding's move today, per share, coin or option share: "+$1.23", "-$0.50" or "$0.00", or "-"
+// when Yahoo gave no previous close. Only called once the holding has a price.
+const dayMove = (p: Holding) => (p.prevClose == null ? NO_PRICE : plParts(p.price! - p.prevClose)[0]);
+
 // One holding's cells in a /portfolio table, in portfolio.columns order, and the P/L dot that
-// follows the row. With `priced`, three more cells: price, value and P/L, left blank before the
+// follows the row. With `priced`, four more cells: price, day, value and P/L, left blank before the
 // first fetch, or each "-" once one has failed.
 function holdingCells(p: Holding, priced: boolean) {
   const cells = [`${positionLabel(p)}${expired(p)}`, formatQuantity(p.sec_type, p.shares)];
   if (!priced) return { cells, dot: '' };
-  if (p.price == null) return { cells: [...cells, ...Array(3).fill(p.priceFailed ? NO_PRICE : '')], dot: '' };
+  if (p.price == null) return { cells: [...cells, ...Array(4).fill(p.priceFailed ? NO_PRICE : '')], dot: '' };
   const [amount, dot] = plParts(value(p.sec_type, p.shares, p.price - p.avgCost));
-  return { cells: [...cells, money(p.price), money(value(p.sec_type, p.shares, p.price)), amount], dot };
+  return { cells: [...cells, money(p.price), dayMove(p), money(value(p.sec_type, p.shares, p.price)), amount], dot };
 }
 
 // "(2 at cost, no price)" after a value that counts holdings without a price at their cost.
 const atCost = (t: Totals) => (t.unpriced ? ` (${t.unpriced} at cost, no price)` : '');
 
-// What a holding shows for each of its price, value and P/L once fetching its price failed (see
+// What a holding shows for each of its price, day, value and P/L once fetching its price failed (see
 // priceOf), in /position and /portfolio alike. Before the first fetch they are left out instead.
 const NO_PRICE = '-';
 
@@ -181,7 +185,7 @@ export const messages = {
     },
     empty: { STOCK: 'No stock holdings.', CRYPTO: 'No crypto holdings.', OPTION: 'No option holdings.' },
     // Added to the table once some holding in it has a price or a failed fetch.
-    priceColumns: ['Price', 'Value', 'P/L'],
+    priceColumns: ['Price', 'Day', 'Value', 'P/L'],
     // /position's single total; /portfolio shows the open tab's totals beside those of every holding.
     // Value appears once some holding has a price, with the rest counted at cost.
     total: (t: Totals) =>
@@ -254,15 +258,15 @@ export const messages = {
   presence: (version: string, apiUp?: boolean) => `v${version}` + (apiUp === undefined ? '' : ` · API: ${apiUp ? '🟢' : '🔴'}`),
 
   // One holding in /position: position, quantity, average cost, cost basis, and once the nightly
-  // job has a price, that price, the current value and the unrealized P/L. If the job tried and
+  // job has a price, that price, today's move, the current value and the unrealized P/L. If the job tried and
   // failed, each of those is "-"; before it has tried, they are left out.
   holdingLine: (p: Holding) =>
     `${holdingLabel(p)} · ${formatQuantity(p.sec_type, p.shares)} ${quantityUnit[p.sec_type]} · ` +
     `avg ${money(p.avgCost)} · cost ${money(value(p.sec_type, p.shares, p.avgCost))}` +
     (p.price != null
-      ? ` · price ${money(p.price)} · value ${money(value(p.sec_type, p.shares, p.price))} · ` +
+      ? ` · price ${money(p.price)} · day ${dayMove(p)} · value ${money(value(p.sec_type, p.shares, p.price))} · ` +
         `P/L ${signed(value(p.sec_type, p.shares, p.price - p.avgCost))}`
-      : p.priceFailed ? ` · price ${NO_PRICE} · value ${NO_PRICE} · P/L ${NO_PRICE}` : ''),
+      : p.priceFailed ? ` · price ${NO_PRICE} · day ${NO_PRICE} · value ${NO_PRICE} · P/L ${NO_PRICE}` : ''),
 
   // A page of a /portfolio holdings tab as a table: holdingLine's fields but average cost and cost
   // basis (see portfolio.columns), one column each.
