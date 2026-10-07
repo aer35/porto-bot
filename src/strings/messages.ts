@@ -68,10 +68,12 @@ function signed(n: number) {
 const dayMove = (p: Holding) => (p.prevClose == null ? NO_PRICE : plParts(p.price! - p.prevClose)[0]);
 
 // One holding's cells in a /portfolio table, in portfolio.columns order, and with `priced` the cells
-// of the line under them and the P/L dot that ends it. A priced holding's first line adds price and
-// value, and the line under it holds the day's move under the price and the P/L under the value.
-// Before the first fetch the price and value are blank and there is no second line; once a fetch
-// has failed, all four are "-".
+// of the line under them and the dot that ends it. A priced holding's first line adds price and
+// value. The line under it holds the day's move under the price, and under the value what that move
+// gained or lost on the whole holding, with the dot coloured by that day's result (the overall P/L
+// is in /position). Without a previous close both day figures are "-" and there is no dot. Before
+// the first fetch the price and value are blank and there is no second line; once a fetch has
+// failed, all four are "-".
 function holdingCells(p: Holding, priced: boolean) {
   const cells = [`${positionLabel(p)}${expired(p)}`, formatQuantity(p.sec_type, p.shares)];
   const blank = cells.map(() => '');
@@ -81,7 +83,7 @@ function holdingCells(p: Holding, priced: boolean) {
       ? { cells: [...cells, NO_PRICE, NO_PRICE], under: [...blank, NO_PRICE, NO_PRICE], dot: '' }
       : { cells: [...cells, '', ''], under: null, dot: '' };
   }
-  const [amount, dot] = plParts(value(p.sec_type, p.shares, p.price - p.avgCost));
+  const [amount, dot] = p.prevClose == null ? [NO_PRICE, ''] : plParts(value(p.sec_type, p.shares, p.price - p.prevClose));
   return {
     cells: [...cells, money(p.price), money(value(p.sec_type, p.shares, p.price))],
     under: [...blank, dayMove(p), amount],
@@ -195,10 +197,9 @@ export const messages = {
       OPTION: ['Contract', '#'],
     },
     empty: { STOCK: 'No stock holdings.', CRYPTO: 'No crypto holdings.', OPTION: 'No option holdings.' },
-    // Added to the table once some holding in it has a price or a failed fetch, with a second heading
-    // line naming what each priced holding shows under them: Day under Price, P/L under Value.
+    // Added to the table once some holding in it has a price or a failed fetch. What a priced holding
+    // shows under them, the day's move and gain or loss, has no heading of its own.
     priceColumns: ['Price', 'Value'],
-    underPriceColumns: ['Day', 'P/L'],
     // /position's single total; /portfolio shows the open tab's totals beside those of every holding.
     // Value appears once some holding has a price, with the rest counted at cost.
     total: (t: Totals) =>
@@ -271,37 +272,32 @@ export const messages = {
   presence: (version: string, apiUp?: boolean) => `v${version}` + (apiUp === undefined ? '' : ` · API: ${apiUp ? '🟢' : '🔴'}`),
 
   // One holding in /position: position, quantity, average cost, cost basis, and once the nightly
-  // job has a price, that price, today's move, the current value and the unrealized P/L. If the job tried and
-  // failed, each of those is "-"; before it has tried, they are left out.
+  // job has a price, that price, today's move, the current value and the unrealized P/L, named
+  // "Total P/L" so it is not taken for the day's gain or loss that /portfolio shows. If the job
+  // tried and failed, each of those is "-"; before it has tried, they are left out.
   holdingLine: (p: Holding) =>
     `${holdingLabel(p)} · ${formatQuantity(p.sec_type, p.shares)} ${quantityUnit[p.sec_type]} · ` +
     `avg ${money(p.avgCost)} · cost ${money(value(p.sec_type, p.shares, p.avgCost))}` +
     (p.price != null
       ? ` · price ${money(p.price)} · day ${dayMove(p)} · value ${money(value(p.sec_type, p.shares, p.price))} · ` +
-        `P/L ${signed(value(p.sec_type, p.shares, p.price - p.avgCost))}`
-      : p.priceFailed ? ` · price ${NO_PRICE} · day ${NO_PRICE} · value ${NO_PRICE} · P/L ${NO_PRICE}` : ''),
+        `Total P/L ${signed(value(p.sec_type, p.shares, p.price - p.avgCost))}`
+      : p.priceFailed ? ` · price ${NO_PRICE} · day ${NO_PRICE} · value ${NO_PRICE} · Total P/L ${NO_PRICE}` : ''),
 
   // A page of a /portfolio holdings tab as a table: holdingLine's fields but average cost and cost
   // basis (see portfolio.columns), one column each.
   // Discord has no tables and its text font is not monospaced, so it is a code block, which is.
   // Each column is as wide as its widest cell on this page (no fixed maximum), two spaces apart,
   // the first left-aligned and the numbers right-aligned. Code blocks show ** literally, so names
-  // are not bold. A priced holding takes two lines, the day's move under its price and the P/L under
-  // its value, so no line carries every column (six in a row wrapped in Discord). The P/L's dot ends
-  // the second line with no space or heading: an emoji is about two letters wide, so anywhere but
-  // the end of a line it would push what comes after it out of line.
+  // are not bold. A priced holding takes two lines, its day under its price and value (see
+  // holdingCells), so no line carries every column (six in a row wrapped in Discord). The dot ends the
+  // second line with no space or heading: an emoji is about two letters wide, so anywhere but the end
+  // of a line it would push what comes after it out of line.
   holdingsTable: (tab: Holdable, holdings: Holding[]) => {
     const priced = holdings.some((p) => p.price != null || p.priceFailed);
-    const columns = messages.portfolio.columns[tab];
-    const headings = [...columns, ...(priced ? messages.portfolio.priceColumns : [])];
-    const underHeadings = priced ? [...columns.map(() => ''), ...messages.portfolio.underPriceColumns] : null;
+    const headings = [...messages.portfolio.columns[tab], ...(priced ? messages.portfolio.priceColumns : [])];
     const rows = holdings.map((p) => holdingCells(p, priced));
     // Every line in the table, as cells; each column is as wide as its widest cell on any of them.
-    const lines = [
-      headings,
-      ...(underHeadings ? [underHeadings] : []),
-      ...rows.flatMap((r) => [r.cells, ...(r.under ? [r.under] : [])]),
-    ];
+    const lines = [headings, ...rows.flatMap((r) => [r.cells, ...(r.under ? [r.under] : [])])];
     const widths = headings.map((_, i) => Math.max(...lines.map((cells) => cells[i].length)));
     const line = (cells: string[]) =>
       cells.map((c, i) => (i === 0 ? c.padEnd(widths[i]) : c.padStart(widths[i]))).join('  ').trimEnd();
@@ -309,7 +305,6 @@ export const messages = {
     return [
       '```',
       line(headings),
-      ...(underHeadings ? [line(underHeadings)] : []),
       rule,
       ...rows.flatMap((r) => [line(r.cells), ...(r.under ? [line(r.under) + r.dot] : [])]),
       '```',

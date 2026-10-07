@@ -253,10 +253,12 @@ A few things worth knowing:
   is `SSS01` and `SL01` is `XSS01`.
 - Every sale shows its realized profit or loss (`P/L`), against the average cost at the time of that sale: 🟢 for a gain,
   🔴 for a loss.
-- `/portfolio` and `/position` show each holding's latest price, how much that price moved on the day (`Day`), what it is worth at that price, and its unrealized
-  profit or loss (see [Price data](#price-data)). A holding the bot has not priced yet shows its cost only. One it
-  could not get a price for shows `-` for its price, value and P/L. Both are counted at cost in the totals. Option values are for
-  the whole contract, 100 times the quoted price.
+- `/portfolio` and `/position` show each holding's latest price, how much that price moved on the day, and what the
+  holding is worth at that price (see [Price data](#price-data)). Under each price and value, `/portfolio` shows the
+  day's move and what it gained or lost the holding that day, 🟢 or 🔴. `/position` shows the holding's whole unrealized
+  profit or loss as `Total P/L`. A holding the bot has not priced yet shows its cost only. One it could not get a price
+  for shows `-` for each of these. Both are counted at cost in the totals. Option values are for the whole contract,
+  100 times the quoted price.
 - Deleting or amending a transaction will **not** change or remove the message already in the channel.
 - The bot never lets you sell more shares than you own, or edit your history into an impossible state.
 - `/reset` and `/split` are limited to members with the **Manage Server** permission (generally moderators). You can change who may use them in

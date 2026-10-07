@@ -142,33 +142,36 @@ test('position shows its holdings and a page of transactions, with page buttons 
 
 test('a priced holding adds price, value and P/L to its row, and the totals add value, counting unpriced holdings at cost', () => {
   const priced = texts(portfolioView('42', 'STOCK', [{ ...aapl, price: 12 }, { ...btc, price: 70_000 }], 0)).join('\n');
-  // Each priced holding takes two lines, headings included: Day under Price and P/L under Value, so
-  // no line carries every column. The P/L's dot rides unlabelled at the very end, where its double
-  // width can't misalign anything.
+  // Each priced holding takes two lines, so no line carries every column: under the price, its move
+  // today, and under the value, what that move gained or lost on the whole holding (12.5 × $0.50),
+  // coloured by the day, not the overall P/L. Only Price and Value are headed. The dot rides at the
+  // very end, where its double width can't misalign anything.
   const pastNameAndShares = ' '.repeat(6 + 2 + 6 + 2);
   assert.deepEqual(table(portfolioView('42', 'STOCK', [{ ...aapl, price: 12, prevClose: 11.5 }], 0)), [
     'Ticker  Shares   Price    Value',
-    `${pastNameAndShares}   Day      P/L`,
     '──────  ──────  ──────  ───────',
     'AAPL      12.5  $12.00  $150.00',
-    `${pastNameAndShares}+$0.50  +$25.00🟢`,
+    `${pastNameAndShares}+$0.50   +$6.25🟢`,
   ]);
+  const down = table(portfolioView('42', 'STOCK', [{ ...aapl, price: 12, prevClose: 13 }], 0));
+  assert.equal(down[3], `${pastNameAndShares}-$1.00  -$12.50🔴`, 'a down day is red, though the holding is up overall');
+  const noClose = table(portfolioView('42', 'STOCK', [{ ...aapl, price: 12, prevClose: null }], 0));
+  assert.equal(noClose[3], `${pastNameAndShares}     -        -`, 'no previous close: no day figures, no dot');
   assert.match(priced, /\*\*Cost basis\*\* \$125\.00 · \*\*Value\*\* \$150\.00 · \*\*Total, all holdings\*\* \$30,125\.00 cost, \$35,150\.00 value$/m);
 
   const partly = texts(portfolioView('42', 'STOCK', [{ ...aapl, price: 12 }, msft, btc], 0)).join('\n');
-  assert.deepEqual(table(portfolioView('42', 'STOCK', [{ ...aapl, price: 12 }, msft], 0)).slice(5), ['MSFT      12.5'], 'not fetched yet: one blank line');
+  assert.deepEqual(table(portfolioView('42', 'STOCK', [{ ...aapl, price: 12 }, msft], 0)).slice(4), ['MSFT      12.5'], 'not fetched yet: one blank line');
   assert.match(partly, /\*\*Value\*\* \$275\.00 \(1 at cost, no price\)/);
   assert.match(partly, /\$30,250\.00 cost, \$30,275\.00 value \(2 at cost, no price\)$/m);
 
   assert.deepEqual(table(portfolioView('42', 'STOCK', [{ ...aapl, price: null, priceFailed: true }], 0)), [
     'Ticker  Shares  Price  Value',
-    `${' '.repeat(18)}Day    P/L`,
     '──────  ──────  ─────  ─────',
     'AAPL      12.5      -      -',
     `${' '.repeat(20)}-      -`,
   ]);
 
   const position = texts(positionView('42', 'AAPL', [{ ...aapl, price: 12, prevClose: 11.5 }], ['tx'], 0, 1)).join('\n');
-  assert.match(position, /price \$12\.00 · day \+\$0\.50 · value \$150\.00 · P\/L 🟢 \+\$25\.00/);
+  assert.match(position, /price \$12\.00 · day \+\$0\.50 · value \$150\.00 · Total P\/L 🟢 \+\$25\.00/);
   assert.match(position, /\*\*Total cost basis\*\* \$125\.00 · \*\*value\*\* \$150\.00$/m);
 });

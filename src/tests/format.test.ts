@@ -104,17 +104,17 @@ test('a priced holdings line adds the current price, current value and unrealize
   const aapl = { sec_type: 'STOCK' as const, ticker: 'AAPL', shares: 12_500, avgCost: 10, opt_right: null, strike: null, expiry: null };
   assert.equal(
     messages.holdingLine({ ...aapl, price: 12, prevClose: 11.5 }),
-    '**AAPL** · 12.5 SHARES · avg $10.00 · cost $125.00 · price $12.00 · day +$0.50 · value $150.00 · P/L 🟢 +$25.00',
+    '**AAPL** · 12.5 SHARES · avg $10.00 · cost $125.00 · price $12.00 · day +$0.50 · value $150.00 · Total P/L 🟢 +$25.00',
   );
   const put = { ...aapl, sec_type: 'OPTION' as const, shares: 2, avgCost: 3.2, opt_right: 'PUT' as const, strike: 150, expiry: JAN_16 };
   // Day is the move of one share, coin or option share since the previous close, signed, no dot.
-  assert.match(messages.holdingLine({ ...put, price: 1.2, prevClose: 1.5 }), / · price \$1\.20 · day -\$0\.30 · value \$240\.00 · P\/L 🔴 -\$400\.00$/);
+  assert.match(messages.holdingLine({ ...put, price: 1.2, prevClose: 1.5 }), / · price \$1\.20 · day -\$0\.30 · value \$240\.00 · Total P\/L 🔴 -\$400\.00$/);
   assert.match(messages.holdingLine({ ...aapl, price: 12, prevClose: 12 }), / · day \$0\.00 · /);
   assert.match(messages.holdingLine({ ...aapl, price: 12, prevClose: null }), / · price \$12\.00 · day - · /, 'no previous close from Yahoo');
   assert.doesNotMatch(messages.holdingLine({ ...aapl, price: null }), /price/);
   assert.equal(
     messages.holdingLine({ ...aapl, price: null, priceFailed: true }),
-    '**AAPL** · 12.5 SHARES · avg $10.00 · cost $125.00 · price - · day - · value - · P/L -',
+    '**AAPL** · 12.5 SHARES · avg $10.00 · cost $125.00 · price - · day - · value - · Total P/L -',
   );
 });
 
