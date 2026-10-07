@@ -12,11 +12,13 @@ const { db } = await import('../queries/db.js');
 
 test('a write waits for another process holding the database, instead of failing as locked', async () => {
   // Stands in for `node dist/fetchPrices.js` run beside the bot with docker compose exec: it takes the write lock,
-  // then commits 200 ms later.
+  // then commits 200 ms later. It opens the file with the same timeout as db.ts, as the real script
+  // does: without one, its commit could fail outright if it landed while the bot's connection
+  // briefly held a read lock between retries.
   const other = new Worker(
     `const { DatabaseSync } = require('node:sqlite');
      const { parentPort, workerData } = require('node:worker_threads');
-     const db = new DatabaseSync(workerData);
+     const db = new DatabaseSync(workerData, { timeout: 5000 });
      db.exec('BEGIN IMMEDIATE');
      db.prepare('INSERT INTO prices (symbol, price, fetched_at) VALUES (?, ?, ?)').run('AAPL', 1, 0);
      parentPort.postMessage('locked');
