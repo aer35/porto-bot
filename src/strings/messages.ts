@@ -67,15 +67,20 @@ function signed(n: number) {
 // when Yahoo gave no previous close. Only called once the holding has a price.
 const dayMove = (p: Holding) => (p.prevClose == null ? NO_PRICE : plParts(p.price! - p.prevClose)[0]);
 
-// One holding's cells in a /portfolio table, in portfolio.columns order, and the P/L dot that
-// follows the row. With `priced`, four more cells: price, day, value and P/L, left blank before the
-// first fetch, or each "-" once one has failed.
+// One holding's cells in a /portfolio table, in portfolio.columns order, and its P/L for the line
+// under them: the amount and the dot that follows it. With `priced`, three more cells: price, day
+// and value. Before the first fetch those are blank and there is no P/L line; once a fetch has
+// failed, each is "-", P/L included.
 function holdingCells(p: Holding, priced: boolean) {
   const cells = [`${positionLabel(p)}${expired(p)}`, formatQuantity(p.sec_type, p.shares)];
-  if (!priced) return { cells, dot: '' };
-  if (p.price == null) return { cells: [...cells, ...Array(4).fill(p.priceFailed ? NO_PRICE : '')], dot: '' };
+  if (!priced) return { cells, pl: null };
+  if (p.price == null) {
+    return p.priceFailed
+      ? { cells: [...cells, NO_PRICE, NO_PRICE, NO_PRICE], pl: { amount: NO_PRICE, dot: '' } }
+      : { cells: [...cells, '', '', ''], pl: null };
+  }
   const [amount, dot] = plParts(value(p.sec_type, p.shares, p.price - p.avgCost));
-  return { cells: [...cells, money(p.price), dayMove(p), money(value(p.sec_type, p.shares, p.price)), amount], dot };
+  return { cells: [...cells, money(p.price), dayMove(p), money(value(p.sec_type, p.shares, p.price))], pl: { amount, dot } };
 }
 
 // "(2 at cost, no price)" after a value that counts holdings without a price at their cost.
@@ -184,8 +189,10 @@ export const messages = {
       OPTION: ['Contract', '#'],
     },
     empty: { STOCK: 'No stock holdings.', CRYPTO: 'No crypto holdings.', OPTION: 'No option holdings.' },
-    // Added to the table once some holding in it has a price or a failed fetch.
-    priceColumns: ['Price', 'Day', 'Value', 'P/L'],
+    // Added to the table once some holding in it has a price or a failed fetch. The P/L heading goes
+    // on a second heading line, under Value, as each holding's P/L does (see holdingsTable).
+    priceColumns: ['Price', 'Day', 'Value'],
+    plHeading: 'P/L',
     // /position's single total; /portfolio shows the open tab's totals beside those of every holding.
     // Value appears once some holding has a price, with the rest counted at cost.
     total: (t: Totals) =>
@@ -273,16 +280,32 @@ export const messages = {
   // Discord has no tables and its text font is not monospaced, so it is a code block, which is.
   // Each column is as wide as its widest cell on this page (no fixed maximum), two spaces apart,
   // the first left-aligned and the numbers right-aligned. Code blocks show ** literally, so names
-  // are not bold. The P/L's dot follows the row with no space or heading: an emoji is about two
-  // letters wide, so anywhere but the end of the line it would push the columns after it out of line.
+  // are not bold. A priced holding's P/L goes on a second line, right-aligned under Value, so no line
+  // carries every column (a seventh column wrapped in Discord). Its dot follows it with no space or
+  // heading: an emoji is about two letters wide, so anywhere but the end of a line it would push
+  // what comes after it out of line.
   holdingsTable: (tab: Holdable, holdings: Holding[]) => {
     const priced = holdings.some((p) => p.price != null || p.priceFailed);
     const headings = [...messages.portfolio.columns[tab], ...(priced ? messages.portfolio.priceColumns : [])];
     const rows = holdings.map((p) => holdingCells(p, priced));
     const widths = headings.map((h, i) => Math.max(h.length, ...rows.map((r) => r.cells[i].length)));
+    // Value also holds the P/L line under it, so it is as wide as the widest of either.
+    if (priced) {
+      const last = widths.length - 1;
+      widths[last] = Math.max(widths[last], messages.portfolio.plHeading.length, ...rows.map((r) => r.pl?.amount.length ?? 0));
+    }
     const line = (cells: string[]) =>
       cells.map((c, i) => (i === 0 ? c.padEnd(widths[i]) : c.padStart(widths[i]))).join('  ').trimEnd();
+    // A line with only `text`, right-aligned in the last column: the P/L under Value.
+    const underLast = (text: string) => line([...Array(widths.length - 1).fill(''), text]);
     const rule = widths.map((w) => '─'.repeat(w)).join('  ');
-    return ['```', line(headings), rule, ...rows.map((r) => line(r.cells) + r.dot), '```'].join('\n');
+    return [
+      '```',
+      line(headings),
+      ...(priced ? [underLast(messages.portfolio.plHeading)] : []),
+      rule,
+      ...rows.flatMap((r) => [line(r.cells), ...(r.pl ? [underLast(r.pl.amount) + r.pl.dot] : [])]),
+      '```',
+    ].join('\n');
   },
 };
