@@ -60,7 +60,7 @@ function signed(n: number) {
 const atCost = (t: Totals) => (t.unpriced ? ` (${t.unpriced} at cost, no price)` : '');
 
 // What a holding shows where its price would be once fetching it failed (see priceOf).
-const priceUnavailable = ' · price unavailable';
+const priceUnavailable = 'price unavailable';
 
 const meta = (tx: Tx, realized?: number | null) =>
   tx.sec_type === 'SPLIT'
@@ -151,15 +151,16 @@ export const messages = {
     title: (userId: string) => `## Portfolio of <@${userId}>`,
     // Tab button labels, also the heading above the open tab.
     tabs: { STOCK: 'Stocks', CRYPTO: 'Crypto', OPTION: 'Options', TX: 'Transactions' },
-    // The field label row above a holdings tab's rows, naming each field of holdingRow in order.
+    // The field label row above a holdings tab's rows, naming each field of holdingRow in order,
+    // with the same | between them.
     columns: {
-      STOCK: '-# Ticker · Shares · Avg cost · Cost basis',
-      CRYPTO: '-# Coin · Coins · Avg cost · Cost basis',
-      OPTION: '-# Contract · Contracts · Avg price · Cost basis',
+      STOCK: '-# Ticker | Shares | Avg cost | Cost basis',
+      CRYPTO: '-# Coin | Coins | Avg cost | Cost basis',
+      OPTION: '-# Contract | Contracts | Avg price | Cost basis',
     },
     empty: { STOCK: 'No stock holdings.', CRYPTO: 'No crypto holdings.', OPTION: 'No option holdings.' },
     // Added to a tab's label row once some holding in it has a price (see holdingRow).
-    priceColumns: ' · Price · Value · P/L',
+    priceColumns: ' | Price | Value | P/L',
     // /position's single total; /portfolio shows the open tab's totals beside those of every holding.
     // Value appears once some holding has a price, with the rest counted at cost.
     total: (t: Totals) =>
@@ -239,13 +240,19 @@ export const messages = {
     (p.price != null
       ? ` · price ${money(p.price)} · value ${money(value(p.sec_type, p.shares, p.price))} · ` +
         `P/L ${signed(value(p.sec_type, p.shares, p.price - p.avgCost))}`
-      : p.priceFailed ? priceUnavailable : ''),
+      : p.priceFailed ? ` · ${priceUnavailable}` : ''),
 
   // One holding in a /portfolio tab: the same fields as holdingLine, named once by portfolio.columns
-  // (and priceColumns, once priced).
+  // (and priceColumns, once priced). Columns are split by | rather than holdingLine's ·, which ran
+  // the numbers together; Discord has no tables, and its font is not monospaced, so they cannot align.
   holdingRow: (p: Holding) =>
-    `${holdingLabel(p)} · ${formatQuantity(p.sec_type, p.shares)} · ${money(p.avgCost)} · ${money(value(p.sec_type, p.shares, p.avgCost))}` +
-    (p.price != null
-      ? ` · ${money(p.price)} · ${money(value(p.sec_type, p.shares, p.price))} · ${signed(value(p.sec_type, p.shares, p.price - p.avgCost))}`
-      : p.priceFailed ? priceUnavailable : ''),
+    [
+      holdingLabel(p),
+      formatQuantity(p.sec_type, p.shares),
+      money(p.avgCost),
+      money(value(p.sec_type, p.shares, p.avgCost)),
+      ...(p.price != null
+        ? [money(p.price), money(value(p.sec_type, p.shares, p.price)), signed(value(p.sec_type, p.shares, p.price - p.avgCost))]
+        : p.priceFailed ? [priceUnavailable] : []),
+    ].join(' | '),
 };

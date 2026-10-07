@@ -38,7 +38,7 @@ test('portfolio renders one tab as components, never pings, with a field label r
   assert.equal(json(view)[0].accent_color, Colors.Green);
   const all = texts(view).join('\n');
   assert.match(all, /## Portfolio of <@42>\n### Stocks/);
-  assert.match(all, /-# Ticker · Shares · Avg cost · Cost basis\n\*\*AAPL\*\* · 12\.5 · \$10\.00 · \$125\.00\n\*\*MSFT\*\*/);
+  assert.match(all, /-# Ticker \| Shares \| Avg cost \| Cost basis\n\*\*AAPL\*\* \| 12\.5 \| \$10\.00 \| \$125\.00\n\*\*MSFT\*\*/);
   assert.match(all, /\*\*Cost basis\*\* \$250\.00 · \*\*Total, all holdings\*\* \$30,450\.00/);
   assert.doesNotMatch(all, /BTC-USD|CALL|```/);
 });
@@ -46,11 +46,11 @@ test('portfolio renders one tab as components, never pings, with a field label r
 test('each holdings tab has its own colour, label row and rows, and an empty tab says so', () => {
   const crypto = portfolioView('42', 'CRYPTO', [call, aapl, btc], 0);
   assert.equal(json(crypto)[0].accent_color, Colors.Blue);
-  assert.match(texts(crypto).join('\n'), /### Crypto\n-# Coin · Coins · Avg cost · Cost basis\n\*\*BTC-USD\*\* · 0\.5 · \$60,000\.00 · \$30,000\.00/);
+  assert.match(texts(crypto).join('\n'), /### Crypto\n-# Coin \| Coins \| Avg cost \| Cost basis\n\*\*BTC-USD\*\* \| 0\.5 \| \$60,000\.00 \| \$30,000\.00/);
 
   const options = portfolioView('42', 'OPTION', [call, aapl, btc], 0);
   assert.equal(json(options)[0].accent_color, Colors.Red);
-  assert.match(texts(options).join('\n'), /### Options\n-# Contract · Contracts · Avg price · Cost basis\n\*\*AAPL CALL \$150\.00 01\/15\/27\*\* · 1 · \$2\.00 · \$200\.00/);
+  assert.match(texts(options).join('\n'), /### Options\n-# Contract \| Contracts \| Avg price \| Cost basis\n\*\*AAPL CALL \$150\.00 01\/15\/27\*\* \| 1 \| \$2\.00 \| \$200\.00/);
 
   const empty = texts(portfolioView('42', 'CRYPTO', [aapl], 0)).join('\n');
   assert.match(empty, /No crypto holdings\./);
@@ -123,16 +123,16 @@ test('position shows its holdings and a page of transactions, with page buttons 
 
 test('a priced holding adds price, value and P/L to its row, and the totals add value, counting unpriced holdings at cost', () => {
   const priced = texts(portfolioView('42', 'STOCK', [{ ...aapl, price: 12 }, { ...btc, price: 70_000 }], 0)).join('\n');
-  assert.match(priced, /-# Ticker · Shares · Avg cost · Cost basis · Price · Value · P\/L\n\*\*AAPL\*\* · 12\.5 · \$10\.00 · \$125\.00 · \$12\.00 · \$150\.00 · 🟢 \+\$25\.00/);
+  assert.match(priced, /-# Ticker \| Shares \| Avg cost \| Cost basis \| Price \| Value \| P\/L\n\*\*AAPL\*\* \| 12\.5 \| \$10\.00 \| \$125\.00 \| \$12\.00 \| \$150\.00 \| 🟢 \+\$25\.00/);
   assert.match(priced, /\*\*Cost basis\*\* \$125\.00 · \*\*Value\*\* \$150\.00 · \*\*Total, all holdings\*\* \$30,125\.00 cost, \$35,150\.00 value$/m);
 
   const partly = texts(portfolioView('42', 'STOCK', [{ ...aapl, price: 12 }, msft, btc], 0)).join('\n');
-  assert.match(partly, /\*\*MSFT\*\* · 12\.5 · \$10\.00 · \$125\.00$/m);
+  assert.match(partly, /\*\*MSFT\*\* \| 12\.5 \| \$10\.00 \| \$125\.00$/m);
   assert.match(partly, /\*\*Value\*\* \$275\.00 \(1 at cost, no price\)/);
   assert.match(partly, /\$30,250\.00 cost, \$30,275\.00 value \(2 at cost, no price\)$/m);
 
   const failed = texts(portfolioView('42', 'STOCK', [{ ...aapl, price: null, priceFailed: true }], 0)).join('\n');
-  assert.match(failed, /-# Ticker · Shares · Avg cost · Cost basis\n\*\*AAPL\*\* · 12\.5 · \$10\.00 · \$125\.00 · price unavailable$/m);
+  assert.match(failed, /-# Ticker \| Shares \| Avg cost \| Cost basis\n\*\*AAPL\*\* \| 12\.5 \| \$10\.00 \| \$125\.00 \| price unavailable$/m);
 
   const position = texts(positionView('42', 'AAPL', [{ ...aapl, price: 12 }], ['tx'], 0, 1)).join('\n');
   assert.match(position, /price \$12\.00 · value \$150\.00 · P\/L 🟢 \+\$25\.00/);
