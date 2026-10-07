@@ -142,15 +142,16 @@ test('position shows its holdings and a page of transactions, with page buttons 
 
 test('a priced holding adds price, value and P/L to its row, and the totals add value, counting unpriced holdings at cost', () => {
   const priced = texts(portfolioView('42', 'STOCK', [{ ...aapl, price: 12 }, { ...btc, price: 70_000 }], 0)).join('\n');
-  // P/L goes on a line of its own under Value, heading included, so no line carries every column.
-  // Its dot rides unlabelled at the very end, where its double width can't misalign anything.
-  const underValue = ' '.repeat(6 + 6 + 6 + 6 + 4 * 2);
+  // Each priced holding takes two lines, headings included: Day under Price and P/L under Value, so
+  // no line carries every column. The P/L's dot rides unlabelled at the very end, where its double
+  // width can't misalign anything.
+  const pastNameAndShares = ' '.repeat(6 + 2 + 6 + 2);
   assert.deepEqual(table(portfolioView('42', 'STOCK', [{ ...aapl, price: 12, prevClose: 11.5 }], 0)), [
-    'Ticker  Shares   Price     Day    Value',
-    `${underValue}    P/L`,
-    '──────  ──────  ──────  ──────  ───────',
-    'AAPL      12.5  $12.00  +$0.50  $150.00',
-    `${underValue}+$25.00🟢`,
+    'Ticker  Shares   Price    Value',
+    `${pastNameAndShares}   Day      P/L`,
+    '──────  ──────  ──────  ───────',
+    'AAPL      12.5  $12.00  $150.00',
+    `${pastNameAndShares}+$0.50  +$25.00🟢`,
   ]);
   assert.match(priced, /\*\*Cost basis\*\* \$125\.00 · \*\*Value\*\* \$150\.00 · \*\*Total, all holdings\*\* \$30,125\.00 cost, \$35,150\.00 value$/m);
 
@@ -160,11 +161,11 @@ test('a priced holding adds price, value and P/L to its row, and the totals add 
   assert.match(partly, /\$30,250\.00 cost, \$30,275\.00 value \(2 at cost, no price\)$/m);
 
   assert.deepEqual(table(portfolioView('42', 'STOCK', [{ ...aapl, price: null, priceFailed: true }], 0)), [
-    'Ticker  Shares  Price  Day  Value',
-    `${' '.repeat(30)}P/L`,
-    '──────  ──────  ─────  ───  ─────',
-    'AAPL      12.5      -    -      -',
-    `${' '.repeat(32)}-`,
+    'Ticker  Shares  Price  Value',
+    `${' '.repeat(18)}Day    P/L`,
+    '──────  ──────  ─────  ─────',
+    'AAPL      12.5      -      -',
+    `${' '.repeat(20)}-      -`,
   ]);
 
   const position = texts(positionView('42', 'AAPL', [{ ...aapl, price: 12, prevClose: 11.5 }], ['tx'], 0, 1)).join('\n');

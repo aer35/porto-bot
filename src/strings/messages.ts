@@ -67,20 +67,26 @@ function signed(n: number) {
 // when Yahoo gave no previous close. Only called once the holding has a price.
 const dayMove = (p: Holding) => (p.prevClose == null ? NO_PRICE : plParts(p.price! - p.prevClose)[0]);
 
-// One holding's cells in a /portfolio table, in portfolio.columns order, and its P/L for the line
-// under them: the amount and the dot that follows it. With `priced`, three more cells: price, day
-// and value. Before the first fetch those are blank and there is no P/L line; once a fetch has
-// failed, each is "-", P/L included.
+// One holding's cells in a /portfolio table, in portfolio.columns order, and with `priced` the cells
+// of the line under them and the P/L dot that ends it. A priced holding's first line adds price and
+// value, and the line under it holds the day's move under the price and the P/L under the value.
+// Before the first fetch the price and value are blank and there is no second line; once a fetch
+// has failed, all four are "-".
 function holdingCells(p: Holding, priced: boolean) {
   const cells = [`${positionLabel(p)}${expired(p)}`, formatQuantity(p.sec_type, p.shares)];
-  if (!priced) return { cells, pl: null };
+  const blank = cells.map(() => '');
+  if (!priced) return { cells, under: null, dot: '' };
   if (p.price == null) {
     return p.priceFailed
-      ? { cells: [...cells, NO_PRICE, NO_PRICE, NO_PRICE], pl: { amount: NO_PRICE, dot: '' } }
-      : { cells: [...cells, '', '', ''], pl: null };
+      ? { cells: [...cells, NO_PRICE, NO_PRICE], under: [...blank, NO_PRICE, NO_PRICE], dot: '' }
+      : { cells: [...cells, '', ''], under: null, dot: '' };
   }
   const [amount, dot] = plParts(value(p.sec_type, p.shares, p.price - p.avgCost));
-  return { cells: [...cells, money(p.price), dayMove(p), money(value(p.sec_type, p.shares, p.price))], pl: { amount, dot } };
+  return {
+    cells: [...cells, money(p.price), money(value(p.sec_type, p.shares, p.price))],
+    under: [...blank, dayMove(p), amount],
+    dot,
+  };
 }
 
 // "(2 at cost, no price)" after a value that counts holdings without a price at their cost.
@@ -189,10 +195,10 @@ export const messages = {
       OPTION: ['Contract', '#'],
     },
     empty: { STOCK: 'No stock holdings.', CRYPTO: 'No crypto holdings.', OPTION: 'No option holdings.' },
-    // Added to the table once some holding in it has a price or a failed fetch. The P/L heading goes
-    // on a second heading line, under Value, as each holding's P/L does (see holdingsTable).
-    priceColumns: ['Price', 'Day', 'Value'],
-    plHeading: 'P/L',
+    // Added to the table once some holding in it has a price or a failed fetch, with a second heading
+    // line naming what each priced holding shows under them: Day under Price, P/L under Value.
+    priceColumns: ['Price', 'Value'],
+    underPriceColumns: ['Day', 'P/L'],
     // /position's single total; /portfolio shows the open tab's totals beside those of every holding.
     // Value appears once some holding has a price, with the rest counted at cost.
     total: (t: Totals) =>
@@ -280,31 +286,32 @@ export const messages = {
   // Discord has no tables and its text font is not monospaced, so it is a code block, which is.
   // Each column is as wide as its widest cell on this page (no fixed maximum), two spaces apart,
   // the first left-aligned and the numbers right-aligned. Code blocks show ** literally, so names
-  // are not bold. A priced holding's P/L goes on a second line, right-aligned under Value, so no line
-  // carries every column (a seventh column wrapped in Discord). Its dot follows it with no space or
-  // heading: an emoji is about two letters wide, so anywhere but the end of a line it would push
-  // what comes after it out of line.
+  // are not bold. A priced holding takes two lines, the day's move under its price and the P/L under
+  // its value, so no line carries every column (six in a row wrapped in Discord). The P/L's dot ends
+  // the second line with no space or heading: an emoji is about two letters wide, so anywhere but
+  // the end of a line it would push what comes after it out of line.
   holdingsTable: (tab: Holdable, holdings: Holding[]) => {
     const priced = holdings.some((p) => p.price != null || p.priceFailed);
-    const headings = [...messages.portfolio.columns[tab], ...(priced ? messages.portfolio.priceColumns : [])];
+    const columns = messages.portfolio.columns[tab];
+    const headings = [...columns, ...(priced ? messages.portfolio.priceColumns : [])];
+    const underHeadings = priced ? [...columns.map(() => ''), ...messages.portfolio.underPriceColumns] : null;
     const rows = holdings.map((p) => holdingCells(p, priced));
-    const widths = headings.map((h, i) => Math.max(h.length, ...rows.map((r) => r.cells[i].length)));
-    // Value also holds the P/L line under it, so it is as wide as the widest of either.
-    if (priced) {
-      const last = widths.length - 1;
-      widths[last] = Math.max(widths[last], messages.portfolio.plHeading.length, ...rows.map((r) => r.pl?.amount.length ?? 0));
-    }
+    // Every line in the table, as cells; each column is as wide as its widest cell on any of them.
+    const lines = [
+      headings,
+      ...(underHeadings ? [underHeadings] : []),
+      ...rows.flatMap((r) => [r.cells, ...(r.under ? [r.under] : [])]),
+    ];
+    const widths = headings.map((_, i) => Math.max(...lines.map((cells) => cells[i].length)));
     const line = (cells: string[]) =>
       cells.map((c, i) => (i === 0 ? c.padEnd(widths[i]) : c.padStart(widths[i]))).join('  ').trimEnd();
-    // A line with only `text`, right-aligned in the last column: the P/L under Value.
-    const underLast = (text: string) => line([...Array(widths.length - 1).fill(''), text]);
     const rule = widths.map((w) => '─'.repeat(w)).join('  ');
     return [
       '```',
       line(headings),
-      ...(priced ? [underLast(messages.portfolio.plHeading)] : []),
+      ...(underHeadings ? [line(underHeadings)] : []),
       rule,
-      ...rows.flatMap((r) => [line(r.cells), ...(r.pl ? [underLast(r.pl.amount) + r.pl.dot] : [])]),
+      ...rows.flatMap((r) => [line(r.cells), ...(r.under ? [line(r.under) + r.dot] : [])]),
       '```',
     ].join('\n');
   },
