@@ -37,7 +37,7 @@ export const withPrices = (positions: Position[]): Holding[] =>
 // Every symbol some member holds, once each.
 export const heldSymbols = () => [...new Set(heldPositions().map(priceSymbol))];
 
-// Yahoo answers HTTP 429 when it throttles; the job backs off and retries on this.
+// Yahoo answers HTTP 429 when it throttles; the job stops on this and leaves the rest to its next run.
 export class RateLimited extends Error {}
 
 // The latest price of one symbol and the previous session's close (null if Yahoo gives none), or
@@ -75,27 +75,20 @@ export const apiUp = (get = getPrice) =>
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Waits after a 429 before retrying the same symbol: 30 s, then 60 s, then 120 s, then give up on it.
-const BACKOFF_MS = [30_000, 60_000, 120_000];
-
 // Fetches every held symbol one at a time, `gapMs` apart, storing each price (or failure) as it
-// arrives, so a crash halfway keeps what was fetched. Returns how many were stored and which had no price.
+// arrives, so a crash halfway keeps what was fetched. A 429 ends the run without marking anything
+// failed, since throttling is not the symbol's fault; the next run, 10 minutes later, starts over.
+// Returns how many were stored and which had no price.
 export async function fetchPrices(get = getPrice, wait = sleep, gapMs = 1_000) {
   const missing: string[] = [];
   let fetched = 0;
   for (const symbol of heldSymbols()) {
     let quote: Awaited<ReturnType<typeof getPrice>> = null;
-    for (let attempt = 0; ; attempt++) {
-      try {
-        quote = await get(symbol);
-        break;
-      } catch (err) {
-        if (!(err instanceof RateLimited) || attempt === BACKOFF_MS.length) {
-          console.error(`price ${symbol}:`, err);
-          break;
-        }
-        await wait(BACKOFF_MS[attempt]);
-      }
+    try {
+      quote = await get(symbol);
+    } catch (err) {
+      console.error(`price ${symbol}:`, err);
+      if (err instanceof RateLimited) break;
     }
     if (quote === null) {
       missing.push(symbol);

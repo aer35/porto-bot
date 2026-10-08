@@ -71,24 +71,31 @@ test('the price job fetches every distinct held symbol once, one at a time, and 
 
   const asked: string[] = [];
   const pauses: number[] = [];
-  let limited = false;
+  // BRK-B has no data; the others answer.
   const fakeGetPrice = async (symbol: string) => {
     asked.push(symbol);
-    // BTC-USD is throttled once, then answers; BRK-B has no data.
-    if (symbol === 'BTC-USD' && !limited) {
-      limited = true;
-      throw new RateLimited();
-    }
     return symbol === 'BRK-B' ? null : { price: 100 + asked.length, prevClose: 99 };
   };
   const result = await fetchPrices(fakeGetPrice, async (ms) => void pauses.push(ms), 1_000);
 
-  assert.deepEqual(asked.toSorted(), ['AAPL', 'BRK-B', 'BTC-USD', 'BTC-USD']);
+  assert.deepEqual(asked.toSorted(), ['AAPL', 'BRK-B', 'BTC-USD']);
   assert.deepEqual(result, { fetched: 2, missing: ['BRK-B'] });
   assert.ok(priceOf('AAPL').price! > 100 && priceOf('BTC-USD').price! > 100);
   assert.equal(priceOf('AAPL').prevClose, 99);
   assert.deepEqual(priceOf('BRK-B'), { price: null, prevClose: null, failed: true }, 'no data from Yahoo is remembered as a failure');
-  assert.ok(pauses.some((ms) => ms >= 30_000), 'backs off after a 429');
+  assert.deepEqual(pauses, [1_000, 1_000, 1_000], 'a second between requests');
+});
+
+test('a 429 ends the run, leaving the remaining symbols to the next run 10 minutes later', async () => {
+  const asked: string[] = [];
+  const throttled = async (symbol: string) => {
+    asked.push(symbol);
+    throw new RateLimited();
+  };
+  const result = await fetchPrices(throttled, async () => {}, 1_000);
+  assert.equal(asked.length, 1, 'nothing more is asked once Yahoo throttles');
+  assert.deepEqual(result, { fetched: 0, missing: [] });
+  assert.equal(priceOf(asked[0]).failed, false, 'throttling is not the symbol\'s failure');
 });
 
 test('prices are fetched while the US market is open, by New York time, plus one fetch just after the close', () => {
