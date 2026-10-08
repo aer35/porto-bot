@@ -264,19 +264,14 @@ A few things worth knowing:
 
 ## Price data
 
-Prices come from [Yahoo Finance](https://finance.yahoo.com/), through the public address its own charts use,
-`query1.finance.yahoo.com`. It needs no account or key, but the machine running the bot must be able to reach that
-address over the internet.
+Prices come from [Yahoo Finance](https://finance.yahoo.com/) through its
+[chart API](https://query1.finance.yahoo.com/v8/finance/chart/AAPL). No account or token is needed.
 
-The bot fetches prices when it starts, then every 10 minutes while the US stock market is open: Monday to Friday,
-9:30 to 16:00 New York time (13:30 to 20:00 UTC in summer, 14:30 to 21:00 UTC in winter), plus once just after the
-close. Crypto follows the same hours. Commands only read stored prices, so they never wait on Yahoo, and the bot keeps
-working if Yahoo is down. Its status shows `API: 🟢` while Yahoo answers and `API: 🔴` when it does not, checked every
-10 minutes.
+The bot checks prices when it starts, then every 10 minutes during standard trading hours: 9:30am to 4:00pm Eastern
+Time, Monday to Friday.
 
-> **porto-bot is not affiliated with Yahoo**, and is not endorsed or supported by it. Yahoo does not offer this as an
-> official service and can change or block it at any time. porto-bot is not responsible for whether the prices are
-> accurate, or for the price feed working at all.
+> porto-bot and its author are not affiliated with Yahoo or its API, and are not responsible for the validity or use
+> of the data either provides.
 
 ---
 
