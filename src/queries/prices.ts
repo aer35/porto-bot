@@ -28,11 +28,12 @@ export const saveFailure = (symbol: string, failedAt: number) =>
     )
     .run(symbol, failedAt);
 
-// The job runs every day, weekends included, so a price it still gets is never much more than a
-// day old. Anything older stopped updating (an expired option, a symbol Yahoo no longer answers
-// for, or one sold and bought back months later) and is treated as no price at all. A failure
-// ages out the same way.
-const MAX_PRICE_AGE_SECONDS = 2 * 24 * 60 * 60;
+// The job only runs while the market is open, so a price it still gets can be as old as the last
+// close: Friday's close is 89.5 hours old by the Tuesday open after a holiday Monday. Anything
+// older than 4 days stopped updating (an expired option, a symbol Yahoo no longer answers for, or
+// one sold and bought back months later) and is treated as no price at all. A failure ages out the
+// same way.
+const MAX_PRICE_AGE_SECONDS = 4 * 24 * 60 * 60;
 
 // A symbol's stored price and the previous close fetched with it, both null unless fetched within
 // MAX_PRICE_AGE_SECONDS (prevClose also when Yahoo gave none). failed is true when
@@ -47,7 +48,3 @@ export function priceOf(symbol: string) {
   const price = fresh?.price ?? null;
   return { price, prevClose: fresh?.prev_close ?? null, failed: price === null && (row?.failed_at ?? 0) >= since };
 }
-
-// When any price was last stored, as unix seconds, or null if never. Seeds the job's schedule at startup.
-export const lastFetchedAt = () =>
-  (db.prepare('SELECT MAX(fetched_at) AS at FROM prices').get() as { at: number | null }).at;

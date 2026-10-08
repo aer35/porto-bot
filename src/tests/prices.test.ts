@@ -4,7 +4,7 @@ import type { NewTx } from '../components/ledger.js';
 
 // config.ts validates env at import, so set it before loading anything that opens the database.
 Object.assign(process.env, { DISCORD_TOKEN: 't', DISCORD_CLIENT_ID: 'c', DISCORD_GUILD_ID: 'g', DB_PATH: ':memory:' });
-const { apiUp, dueForPrices, fetchPrices, getPrice, heldSymbols, priceSymbol, RateLimited } = await import('../components/prices.js');
+const { apiUp, fetchPrices, getPrice, heldSymbols, marketOpen, priceSymbol, RateLimited } = await import('../components/prices.js');
 const { priceOf } = await import('../queries/prices.js');
 const { commitChange } = await import('../components/userLedger.js');
 
@@ -91,16 +91,19 @@ test('the price job fetches every distinct held symbol once, one at a time, and 
   assert.ok(pauses.some((ms) => ms >= 30_000), 'backs off after a 429');
 });
 
-test('the price job runs at startup unless it already has the latest close, then after each 17:00 in New York', () => {
-  const at = (iso: string) => new Date(iso);
-  const unix = (iso: string) => Date.parse(iso) / 1000;
-  // In March 2026 New York is UTC-4 from the 8th: 14:00 UTC is 10:00 there, 21:30 UTC is 17:30.
-  assert.equal(dueForPrices(at('2026-03-10T14:00:00Z'), null), true, 'never run: fetch now, whatever the hour');
-  assert.equal(dueForPrices(at('2026-03-10T14:00:00Z'), unix('2026-03-09T21:05:00Z')), false, "has last night's close");
-  assert.equal(dueForPrices(at('2026-03-10T14:00:00Z'), unix('2026-03-08T21:05:00Z')), true, 'missed last night');
-  assert.equal(dueForPrices(at('2026-03-10T21:30:00Z'), unix('2026-03-09T21:05:00Z')), true, "tonight's close");
-  assert.equal(dueForPrices(at('2026-03-10T21:30:00Z'), unix('2026-03-10T14:00:00Z')), true, 'ran this morning, before the close');
-  assert.equal(dueForPrices(at('2026-03-10T23:00:00Z'), unix('2026-03-10T21:05:00Z')), false, 'already ran tonight');
+test('prices are fetched while the US market is open, by New York time, plus one fetch just after the close', () => {
+  const at = (iso: string) => marketOpen(new Date(iso));
+  // 9:30 to 16:00 in New York is 13:30 to 20:00 UTC in summer (EDT, UTC-4)...
+  assert.equal(at('2026-03-10T13:29:00Z'), false, 'Tuesday 09:29 EDT');
+  assert.equal(at('2026-03-10T13:30:00Z'), true, 'Tuesday 09:30 EDT, the open');
+  assert.equal(at('2026-03-10T20:10:00Z'), true, '16:10 EDT, the fetch that stores the close');
+  assert.equal(at('2026-03-10T20:11:00Z'), false, '16:11 EDT');
+  // ...and 14:30 to 21:00 UTC in winter (EST, UTC-5), so a fixed UTC window would be an hour off.
+  assert.equal(at('2026-01-13T13:45:00Z'), false, 'Tuesday 08:45 EST');
+  assert.equal(at('2026-01-13T14:30:00Z'), true, 'Tuesday 09:30 EST');
+  assert.equal(at('2026-01-13T21:05:00Z'), true, '16:05 EST');
+  assert.equal(at('2026-03-14T15:00:00Z'), false, 'Saturday');
+  assert.equal(at('2026-03-15T15:00:00Z'), false, 'Sunday');
 });
 
 test('withPrices attaches each holding its stored price, or null', async () => {
@@ -114,11 +117,12 @@ test('withPrices attaches each holding its stored price, or null', async () => {
   assert.deepEqual(priced.map((p) => [p.price, p.prevClose, p.priceFailed]), [[500, 490, false], [null, null, false]]);
 });
 
-test('a price older than 2 days counts as no price, so a stale one is never shown as current', async () => {
+test('a price older than 4 days counts as no price, so a stale one is never shown as current', async () => {
   const { savePrice } = await import('../queries/prices.js');
   const now = Math.floor(Date.now() / 1000);
-  savePrice('FRESH', 10, 9, now - 36 * 3600);
-  savePrice('STALE', 10, 9, now - 49 * 3600);
+  // Friday's close is still shown on Tuesday morning after a holiday Monday, 89.5 hours later.
+  savePrice('FRESH', 10, 9, now - 90 * 3600);
+  savePrice('STALE', 10, 9, now - 97 * 3600);
   assert.equal(priceOf('FRESH').price, 10);
   assert.equal(priceOf('STALE').price, null);
 });
@@ -135,8 +139,8 @@ test('a failed fetch counts until a fetch succeeds, but never hides a price that
   saveFailure('BLIP', now);
   assert.deepEqual(priceOf('BLIP'), { price: 5, prevClose: 4, failed: false }, "yesterday's price outlasts one failed night");
 
-  saveFailure('OLD', now - 49 * 3600);
-  assert.deepEqual(priceOf('OLD'), { price: null, prevClose: null, failed: false }, 'a failure older than 2 days is forgotten, like a price');
+  saveFailure('OLD', now - 97 * 3600);
+  assert.deepEqual(priceOf('OLD'), { price: null, prevClose: null, failed: false }, 'a failure older than 4 days is forgotten, like a price');
 });
 
 test('apiUp is true only when Yahoo answers with a price, and never throws', async () => {

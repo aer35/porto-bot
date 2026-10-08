@@ -273,8 +273,10 @@ Prices come from [Yahoo Finance](https://finance.yahoo.com/), through the public
 `query1.finance.yahoo.com`. It needs no account or key, but the machine running the bot must be able to reach that
 address over the internet.
 
-The bot fetches the price of everything members hold every evening after 17:00 New York time, and also when it starts
-if it missed the last one. Commands only read the prices already stored, so they never wait on Yahoo. If Yahoo is
+The bot fetches the price of everything members hold when it starts, then every 10 minutes while the US stock market
+is open: Monday to Friday, 9:30 to 16:00 New York time (13:30 to 20:00 UTC in summer, 14:30 to 21:00 UTC in winter),
+plus one fetch just after the close to get the closing price. Crypto is fetched in the same hours, so outside them it
+shows the last price fetched. Commands only read the prices already stored, so they never wait on Yahoo. If Yahoo is
 down, the bot keeps working and holdings without a price are counted at cost. The bot's status shows `API: 🟢` while
 Yahoo answers and `API: 🔴` when it does not, checked every 10 minutes.
 

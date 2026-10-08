@@ -1,4 +1,4 @@
-import { heldPositions, lastFetchedAt, priceOf, saveFailure, savePrice } from '../queries/prices.js';
+import { heldPositions, priceOf, saveFailure, savePrice } from '../queries/prices.js';
 import type { Position } from './ledger.js';
 import { toDateString } from './validate.js';
 
@@ -20,7 +20,7 @@ export function priceSymbol(p: Priced) {
 }
 
 // A position with its latest stored price and the previous close fetched with it, null until the
-// nightly job has them. priceFailed is true when the job tried and got nothing (see priceOf), so
+// price job has them. priceFailed is true when the job tried and got nothing (see priceOf), so
 // views can say so instead of showing nothing.
 export type Holding = Position & { price?: number | null; prevClose?: number | null; priceFailed?: boolean };
 
@@ -110,53 +110,47 @@ export async function fetchPrices(get = getPrice, wait = sleep, gapMs = 1_000) {
   return { fetched, missing };
 }
 
-// Date and hour in New York, where the US market closes at 16:00. Deliberately not the configured
-// TZ, which only decides what "today" means for trade dates.
+// Weekday and minutes past midnight in New York, where the US market trades. Computed from the New
+// York clock rather than fixed UTC hours, because daylight saving moves the market's UTC hours:
+// 13:30-20:00 UTC in summer, 14:30-21:00 UTC in winter. Deliberately not the configured TZ, which
+// only decides what "today" means for trade dates.
 function newYork(date: Date) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
+  const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
+    weekday: 'short',
     hour: 'numeric',
+    minute: 'numeric',
     hourCycle: 'h23',
   }).formatToParts(date);
   const part = (type: string) => parts.find((p) => p.type === type)!.value;
-  return { day: `${part('year')}-${part('month')}-${part('day')}`, hour: Number(part('hour')) };
+  return { weekday: part('weekday'), minutes: Number(part('hour')) * 60 + Number(part('minute')) };
 }
 
-// The New York day whose close a fetch at `date` sees: that day from 17:00, the day before until then.
-function closeOf(date: Date) {
-  const { day, hour } = newYork(date);
-  return hour >= 17 ? day : new Date(Date.parse(day) - 86_400_000).toISOString().slice(0, 10);
+// Whether prices are worth fetching: Monday to Friday from the 9:30 open to 16:10 in New York. The
+// ten minutes after the 16:00 close let one more fetch store the closing price. Crypto trades all
+// week but is only fetched in these hours too.
+// ponytail: market holidays are not modelled, so the job also runs on them; prices just do not move.
+export function marketOpen(date: Date) {
+  const { weekday, minutes } = newYork(date);
+  return weekday !== 'Sat' && weekday !== 'Sun' && minutes >= 9 * 60 + 30 && minutes <= 16 * 60 + 10;
 }
 
-// Due when nothing has been fetched since the latest 17:00 in New York, so stock prices are that
-// day's close. That makes a fresh install, or a bot that was down at 17:00, fetch at startup, while
-// a restart the same night does not. `lastRun` is unix seconds of the previous run, or null.
-export const dueForPrices = (now: Date, lastRun: number | null) =>
-  lastRun === null || closeOf(new Date(lastRun * 1000)) !== closeOf(now);
-
-// Checks at startup and then every hour whether the fetch is due. It runs in the background: no
-// command waits on it, and nothing it throws reaches the bot. The last run lives in memory, seeded
-// from the newest stored price.
+// Fetches once at startup, then every 10 minutes while the market is open (see marketOpen). It runs
+// in the background: no command waits on it, a run still going when the next is due is not
+// doubled up, and nothing it throws reaches the bot.
 export function schedulePrices() {
-  let lastRun: number | null | undefined;
   let running = false;
-  const tick = async () => {
+  const run = async () => {
     if (running) return;
     running = true;
     try {
-      lastRun ??= lastFetchedAt();
-      if (!dueForPrices(new Date(), lastRun)) return;
       await fetchPrices();
-      lastRun = Math.floor(Date.now() / 1000);
     } catch (err) {
       console.error('price job:', err);
     } finally {
       running = false;
     }
   };
-  setInterval(tick, 60 * 60 * 1000);
-  void tick();
+  setInterval(() => marketOpen(new Date()) && void run(), 10 * 60 * 1000);
+  void run();
 }

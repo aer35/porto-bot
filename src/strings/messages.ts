@@ -265,7 +265,7 @@ export const messages = {
   // index.ts) whether the price API answers.
   presence: (version: string, apiUp?: boolean) => `v${version}` + (apiUp === undefined ? '' : ` · API: ${apiUp ? '🟢' : '🔴'}`),
 
-  // One holding in /position: position, quantity, average cost, cost basis, and once the nightly
+  // One holding in /position: position, quantity, average cost, cost basis, and once the price
   // job has a price, that price, today's move, the current value and the unrealized P/L, named
   // "Total P/L" so it is not taken for the day's gain or loss that /portfolio shows. If the job
   // tried and failed, each of those is "-"; before it has tried, they are left out.
