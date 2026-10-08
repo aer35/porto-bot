@@ -264,14 +264,16 @@ A few things worth knowing:
 
 ## Price data
 
-Prices come from [Yahoo Finance](https://finance.yahoo.com/) through its
-[chart API](https://query1.finance.yahoo.com/v8/finance/chart/AAPL). No account or token is needed.
+Prices come from [Yahoo Finance](https://finance.yahoo.com/), through the public address its own charts use:
+`https://query1.finance.yahoo.com/v8/finance/chart/`. No account or token is needed.
 
 The bot checks prices when it starts, then every 10 minutes during standard trading hours: 9:30am to 4:00pm Eastern
 Time, Monday to Friday.
 
-> porto-bot and its author are not affiliated with Yahoo or its API, and are not responsible for the validity or use
-> of the data either provides.
+> porto-bot and its authors are not affiliated with, endorsed by, or supported by Yahoo. This address is not an
+> official Yahoo service, and Yahoo can change, limit or block it at any time. porto-bot and its authors are not
+> responsible for the validity or use of the data it provides, or for it being available. Prices may be delayed or
+> wrong, and nothing the bot shows is financial advice.
 
 ---
 
