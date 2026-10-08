@@ -134,8 +134,8 @@ docker compose logs porto-bot
 ```
 
 Look for a line starting with `Logged in as`. Your bot should now show as online in your server's member list, with
-the version it runs and whether it can reach its price source as its status, like `v2.5.0 · API: 🟢` (see
-[Price data](#price-data)). The `API` part appears a few seconds after the bot starts.
+its version and price-feed status as its status, like `v2.5.0 · API: 🟢` (see [Price data](#price-data)). The `API`
+part appears a few seconds after the bot starts.
 
 ---
 
@@ -253,13 +253,10 @@ A few things worth knowing:
   is `SSS01` and `SL01` is `XSS01`.
 - Every sale shows its realized profit or loss (`P/L`), against the average cost at the time of that sale: 🟢 for a gain,
   🔴 for a loss.
-- `/portfolio` and `/position` show each holding's latest price, how much that price moved on the day, and what the
-  holding is worth at that price (see [Price data](#price-data)). Under each price and value, `/portfolio` shows the
-  day's move and what it gained or lost the holding that day, 🟢 or 🔴. `/position` shows the holding's whole unrealized
-  profit or loss as `Total P/L`. A holding without a price, because the bot has not fetched one yet or
-  could not get one, shows `-` for each of these in `/portfolio`. In `/position`, one not fetched yet shows its cost only,
-  and one it could not get shows `-`. Both are counted at cost in the totals. Option values are for the whole contract,
-  100 times the quoted price.
+- `/portfolio` shows each holding's price and value, with the day's price move and the day's gain or loss (🟢/🔴)
+  under them. `/position` also shows average cost, cost basis and `Total P/L`, the profit or loss since buying.
+- A holding with no price shows `-` (in `/position`, only its cost until the first fetch) and counts at cost in the
+  totals. Option values are for the whole contract, 100 times the quoted price. See [Price data](#price-data).
 - Deleting or amending a transaction will **not** change or remove the message already in the channel.
 - The bot never lets you sell more shares than you own, or edit your history into an impossible state.
 - `/reset` and `/split` are limited to members with the **Manage Server** permission (generally moderators). You can change who may use them in
@@ -273,12 +270,11 @@ Prices come from [Yahoo Finance](https://finance.yahoo.com/), through the public
 `query1.finance.yahoo.com`. It needs no account or key, but the machine running the bot must be able to reach that
 address over the internet.
 
-The bot fetches the price of everything members hold when it starts, then every 10 minutes while the US stock market
-is open: Monday to Friday, 9:30 to 16:00 New York time (13:30 to 20:00 UTC in summer, 14:30 to 21:00 UTC in winter),
-plus one fetch just after the close to get the closing price. Crypto is fetched in the same hours, so outside them it
-shows the last price fetched. Commands only read the prices already stored, so they never wait on Yahoo. If Yahoo is
-down, the bot keeps working and holdings without a price are counted at cost. The bot's status shows `API: 🟢` while
-Yahoo answers and `API: 🔴` when it does not, checked every 10 minutes.
+The bot fetches prices when it starts, then every 10 minutes while the US stock market is open: Monday to Friday,
+9:30 to 16:00 New York time (13:30 to 20:00 UTC in summer, 14:30 to 21:00 UTC in winter), plus once just after the
+close. Crypto follows the same hours. Commands only read stored prices, so they never wait on Yahoo, and the bot keeps
+working if Yahoo is down. Its status shows `API: 🟢` while Yahoo answers and `API: 🔴` when it does not, checked every
+10 minutes.
 
 > **porto-bot is not affiliated with Yahoo**, and is not endorsed or supported by it. Yahoo does not offer this as an
 > official service and can change or block it at any time. porto-bot is not responsible for whether the prices are
@@ -335,7 +331,7 @@ docker compose cp porto-bot:/data/porto.db ./porto-backup.db
 docker compose start porto-bot
 ```
 
-The bot also backs up the database by itself whenever an update changes its layout, just before applying the change. These copies sit next to `porto.db` in the volume, named like `porto.db.v2-backup-2026-09-26T13-45-00.db`, and are never deleted automatically. Remove old ones when you no longer need them.
+The bot also backs up the database by itself whenever an update changes its layout, just before applying the change. These copies sit next to `porto.db` in the volume, named like `porto.db.v2026092800-backup-2026-09-26T13-45-00.db`, and are never deleted automatically. Remove old ones when you no longer need them.
 
 To restore that backup:
 
