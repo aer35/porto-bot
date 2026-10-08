@@ -1,12 +1,10 @@
-import { heldPositions, priceOf, saveFailure, savePrice } from '../queries/prices.js';
+import { heldPositions, priceOf, saveFailure, savePrice, type Priced } from '../queries/prices.js';
 import type { Position } from './ledger.js';
 import { toDateString } from './validate.js';
 
 // Price data from Yahoo Finance's chart endpoint; see "Price data" in CLAUDE.md for why this
 // source, its limits, and the symbol formats. Everything provider-specific is in priceSymbol and
 // getPrice, so swapping providers means rewriting those two.
-
-type Priced = Pick<Position, 'sec_type' | 'ticker' | 'opt_right' | 'strike' | 'expiry'>;
 
 // Yahoo's symbol for a position. Share classes use a dash (BRK.B → BRK-B). An option is the OCC
 // symbol without padding: root, expiry as YYMMDD, C or P, then the strike × 1000 in 8 digits,
@@ -103,11 +101,14 @@ export async function fetchPrices(get = getPrice, wait = sleep, gapMs = 1_000) {
   return { fetched, missing };
 }
 
-// Weekday and minutes past midnight in New York, where the US market trades. Computed from the New
-// York clock rather than fixed UTC hours, because daylight saving moves the market's UTC hours:
-// 13:30-20:00 UTC in summer, 14:30-21:00 UTC in winter. Deliberately not the configured TZ, which
-// only decides what "today" means for trade dates.
-function newYork(date: Date) {
+// Whether prices are worth fetching: Monday to Friday from the 9:30 open to 16:10 in New York. The
+// ten minutes after the 16:00 close let one more fetch store the closing price. Crypto trades all
+// week but is only fetched in these hours too. Read off the New York clock rather than fixed UTC
+// hours, because daylight saving moves the market's UTC hours: 13:30-20:00 UTC in summer,
+// 14:30-21:00 UTC in winter. Deliberately not the configured TZ, which only decides what "today"
+// means for trade dates.
+// ponytail: market holidays are not modelled, so the job also runs on them; prices just do not move.
+export function marketOpen(date: Date) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
     weekday: 'short',
@@ -116,16 +117,8 @@ function newYork(date: Date) {
     hourCycle: 'h23',
   }).formatToParts(date);
   const part = (type: string) => parts.find((p) => p.type === type)!.value;
-  return { weekday: part('weekday'), minutes: Number(part('hour')) * 60 + Number(part('minute')) };
-}
-
-// Whether prices are worth fetching: Monday to Friday from the 9:30 open to 16:10 in New York. The
-// ten minutes after the 16:00 close let one more fetch store the closing price. Crypto trades all
-// week but is only fetched in these hours too.
-// ponytail: market holidays are not modelled, so the job also runs on them; prices just do not move.
-export function marketOpen(date: Date) {
-  const { weekday, minutes } = newYork(date);
-  return weekday !== 'Sat' && weekday !== 'Sun' && minutes >= 9 * 60 + 30 && minutes <= 16 * 60 + 10;
+  const minutes = Number(part('hour')) * 60 + Number(part('minute'));
+  return part('weekday') !== 'Sat' && part('weekday') !== 'Sun' && minutes >= 9 * 60 + 30 && minutes <= 16 * 60 + 10;
 }
 
 // Fetches once at startup, then every 10 minutes while the market is open (see marketOpen). It runs

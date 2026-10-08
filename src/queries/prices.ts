@@ -1,12 +1,12 @@
 import type { Position } from '../components/ledger.js';
 import { db } from './db.js';
 
+// What identifies a position to price: its type, ticker, and for an option its contract.
+export type Priced = Pick<Position, 'sec_type' | 'ticker' | 'opt_right' | 'strike' | 'expiry'>;
+
 // Every position any member holds, once each. The price job turns these into symbols to fetch.
 export const heldPositions = () =>
-  db.prepare('SELECT DISTINCT sec_type, ticker, opt_right, strike, expiry FROM holdings').all() as Pick<
-    Position,
-    'sec_type' | 'ticker' | 'opt_right' | 'strike' | 'expiry'
-  >[];
+  db.prepare('SELECT DISTINCT sec_type, ticker, opt_right, strike, expiry FROM holdings').all() as Priced[];
 
 // Stores a symbol's latest price and previous close, replacing the previous ones and clearing any
 // earlier failure.
