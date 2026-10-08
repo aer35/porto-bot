@@ -1,5 +1,6 @@
 import { date, money } from '../components/format.js';
-import type { Position, Tx } from '../components/ledger.js';
+import type { Tx } from '../components/ledger.js';
+import type { Holding, Totals } from '../components/prices.js';
 import { formatQuantity, value, type Holdable } from '../components/units.js';
 import { shortDate, toDateString } from '../components/validate.js';
 
@@ -38,7 +39,7 @@ const expired = (p: Contract) =>
   p.sec_type === 'OPTION' && toDateString(p.expiry!) < toDateString(Date.now() / 1000) ? ' (expired)' : '';
 
 // A holding's name in bold, then the expired mark if any.
-const holdingLabel = (p: Position) => `**${positionLabel(p)}**${expired(p)}`;
+const holdingLabel = (p: Holding) => `**${positionLabel(p)}**${expired(p)}`;
 
 const action = (tx: Tx, counts?: [number, number]) =>
   tx.sec_type === 'SPLIT'
@@ -48,12 +49,48 @@ const action = (tx: Tx, counts?: [number, number]) =>
       // Crypto is bought for a total ("0.5 BTC for $30,000"); the price per coin goes on the next line.
       (tx.sec_type === 'CRYPTO' ? `for ${money(value(tx.sec_type, tx.shares!, tx.price!))}` : `@ ${money(tx.price!)}`);
 
-// P/L with a coloured dot and its sign, e.g. "🟢 +$150.00", "🔴 -$0.50", or "⚪ $0.00" when it
-// rounds to nothing. Compared in cents, so a P/L of a fraction of a cent never shows "🔴 -$0.00".
-function signed(n: number) {
+// P/L as its signed amount and coloured dot, e.g. ["+$150.00", "🟢"], ["-$0.50", "🔴"], or
+// ["$0.00", "⚪"] when it rounds to nothing. Compared in cents, so a P/L of a fraction of a cent
+// never shows "-$0.00".
+function plParts(n: number) {
   const cents = Math.round(n * 100);
-  return cents > 0 ? `🟢 +${money(n)}` : cents < 0 ? `🔴 -${money(-n)}` : `⚪ ${money(0)}`;
+  return cents > 0 ? [`+${money(n)}`, '🟢'] : cents < 0 ? [`-${money(-n)}`, '🔴'] : [money(0), '⚪'];
 }
+
+// P/L in running text, dot first: "🟢 +$150.00".
+function signed(n: number) {
+  const [amount, dot] = plParts(n);
+  return `${dot} ${amount}`;
+}
+
+// A holding's move today, per share, coin or option share: "+$1.23", "-$0.50" or "$0.00", or "-"
+// when Yahoo gave no previous close. Only called once the holding has a price.
+const dayMove = (p: Holding) => (p.prevClose == null ? NO_PRICE : plParts(p.price! - p.prevClose)[0]);
+
+// One holding's cells in a /portfolio table, in portfolio.columns order then price and value, the
+// cells of the line under them, and the dot that ends that line. Under the price goes the day's
+// move, and under the value what that move gained or lost on the whole holding, with the dot
+// coloured by that day's result (the overall P/L is in /position). Without a previous close both
+// day figures are "-" and there is no dot; without a price (not fetched yet, or the fetch failed),
+// all four are.
+function holdingCells(p: Holding) {
+  const cells = [`${positionLabel(p)}${expired(p)}`, formatQuantity(p.sec_type, p.shares)];
+  const blank = cells.map(() => '');
+  if (p.price == null) return { cells: [...cells, NO_PRICE, NO_PRICE], under: [...blank, NO_PRICE, NO_PRICE], dot: '' };
+  const [amount, dot] = p.prevClose == null ? [NO_PRICE, ''] : plParts(value(p.sec_type, p.shares, p.price - p.prevClose));
+  return {
+    cells: [...cells, money(p.price), money(value(p.sec_type, p.shares, p.price))],
+    under: [...blank, dayMove(p), amount],
+    dot,
+  };
+}
+
+// "(2 at cost, no price)" after a value that counts holdings without a price at their cost.
+const atCost = (t: Totals) => (t.unpriced ? ` (${t.unpriced} at cost, no price)` : '');
+
+// What a holding shows for each of its price, day, value and P/L once fetching its price failed (see
+// priceOf), in /position and /portfolio alike. Before the first fetch they are left out instead.
+const NO_PRICE = '-';
 
 const meta = (tx: Tx, realized?: number | null) =>
   tx.sec_type === 'SPLIT'
@@ -86,14 +123,18 @@ export const messages = {
 
   options: {
     ticker: 'Ticker symbol, e.g. AAPL',
+    // /buy and /sell ticker captions name where prices come from (see Price data in CLAUDE.md), so a
+    // mistyped ticker is the member's to notice: the bot only checks a ticker's format. Yahoo writes
+    // share classes with a dash; the bot takes a dot and converts it.
+    stockTicker: 'Ticker as on Yahoo Finance, e.g. AAPL. Write share classes with a dot: BRK.B',
     shares: 'Number of shares, up to 3 decimals, e.g. 12.785',
     price: 'Price per share',
     anyTicker: 'Ticker symbol, e.g. AAPL or BTC-USD',
-    cryptoTicker: 'Coin and currency, e.g. BTC-USD. BTC alone means BTC-USD',
+    cryptoTicker: 'Coin and currency as on Yahoo Finance, e.g. BTC-USD. BTC alone means BTC-USD',
     amount: 'Number of coins, up to 6 decimals, e.g. 0.00034',
     totalPaid: 'What you paid in total, in USD, e.g. 100',
     totalReceived: 'What you received in total, in USD, e.g. 100. Can be 0',
-    optionTicker: 'Ticker of the underlying stock, e.g. AAPL',
+    optionTicker: 'Underlying stock ticker as on Yahoo Finance, e.g. AAPL',
     type: 'Call or put',
     strike: 'Strike price per share, e.g. 150',
     expiry: 'Expiry as MM/DD/YY, or MM/DD for this year. For a buy, today or later',
@@ -140,23 +181,36 @@ export const messages = {
     title: (userId: string) => `## Portfolio of <@${userId}>`,
     // Tab button labels, also the heading above the open tab.
     tabs: { STOCK: 'Stocks', CRYPTO: 'Crypto', OPTION: 'Options', TX: 'Transactions' },
-    // The field label row above a holdings tab's rows, naming each field of holdingRow in order.
+    // The column headings of a holdings tab's table (holdingsTable), before any price columns.
+    // Average cost and cost basis are left to /position: with them the table was too wide to
+    // render in Discord.
     columns: {
-      STOCK: '-# Ticker · Shares · Avg cost · Cost basis',
-      CRYPTO: '-# Coin · Coins · Avg cost · Cost basis',
-      OPTION: '-# Contract · Contracts · Avg price · Cost basis',
+      STOCK: ['Ticker', 'Shares'],
+      CRYPTO: ['Coin', 'Coins'],
+      // "#" because "Contracts" was far wider than the counts under it.
+      OPTION: ['Contract', '#'],
     },
     empty: { STOCK: 'No stock holdings.', CRYPTO: 'No crypto holdings.', OPTION: 'No option holdings.' },
-    // /position's single total; /portfolio shows the open tab's cost beside the total of every holding.
-    total: (cost: number) => `**Total cost basis** ${money(cost)}`,
-    tabTotal: (tabCost: number, allCost: number) => `**Cost basis** ${money(tabCost)} · **Total, all holdings** ${money(allCost)}`,
+    // After those, on every holdings table. What a holding shows under them, the day's move and gain
+    // or loss, has no heading of its own.
+    priceColumns: ['Price', 'Value'],
+    // /position's single total; /portfolio shows the open tab's totals beside those of every holding.
+    // Value appears once some holding has a price, with the rest counted at cost.
+    total: (t: Totals) =>
+      `**Total cost basis** ${money(t.cost)}` + (t.current === null ? '' : ` · **value** ${money(t.current)}${atCost(t)}`),
+    tabTotal: (tab: Totals, all: Totals) =>
+      `**Cost basis** ${money(tab.cost)}` +
+      (tab.current === null ? '' : ` · **Value** ${money(tab.current)}${atCost(tab)}`) +
+      ` · **Total, all holdings** ${money(all.cost)}` +
+      (all.current === null ? '' : ` cost, ${money(all.current)} value${atCost(all)}`),
     noTransactions: 'No transactions yet.',
   },
 
   position: {
-    description: 'Show every transaction for one ticker, with IDs for /amend and /delete',
+    description: "Show one ticker's holdings, options included, and its transactions, with IDs for /amend and /delete",
     none: (userId: string, ticker: string) => `<@${userId}> has no **${ticker}** transactions.`,
-    noShares: 'No shares held.',
+    // A ticker may be held as shares or as option contracts, so not "No shares held".
+    nothingHeld: 'Nothing held.',
     title: (userId: string, ticker: string) => `## ${ticker} — <@${userId}>`,
     transactions: '### Transactions',
   },
@@ -207,12 +261,46 @@ export const messages = {
       `Applied a ${ratio.split_to}:${ratio.split_from} split to **${ticker}** for ${count} ${count === 1 ? 'member' : 'members'}.`,
   },
 
-  // One holding in /position: position, quantity, average cost, cost basis.
-  holdingLine: (p: Position) =>
-    `${holdingLabel(p)} · ${formatQuantity(p.sec_type, p.shares)} ${quantityUnit[p.sec_type]} · ` +
-    `avg ${money(p.avgCost)} · cost ${money(value(p.sec_type, p.shares, p.avgCost))}`,
+  // The bot's custom status in the member list: its version, then once checked (see apiUp in
+  // index.ts) whether the price API answers.
+  presence: (version: string, apiUp?: boolean) => `v${version}` + (apiUp === undefined ? '' : ` · API: ${apiUp ? '🟢' : '🔴'}`),
 
-  // One holding in a /portfolio tab: the same fields as holdingLine, named once by portfolio.columns.
-  holdingRow: (p: Position) =>
-    `${holdingLabel(p)} · ${formatQuantity(p.sec_type, p.shares)} · ${money(p.avgCost)} · ${money(value(p.sec_type, p.shares, p.avgCost))}`,
+  // One holding in /position: position, quantity, average cost, cost basis, and once the price
+  // job has a price, that price, today's move, the current value and the unrealized P/L, named
+  // "Total P/L" so it is not taken for the day's gain or loss that /portfolio shows. If the job
+  // tried and failed, each of those is "-"; before it has tried, they are left out.
+  holdingLine: (p: Holding) =>
+    `${holdingLabel(p)} · ${formatQuantity(p.sec_type, p.shares)} ${quantityUnit[p.sec_type]} · ` +
+    `avg ${money(p.avgCost)} · cost ${money(value(p.sec_type, p.shares, p.avgCost))}` +
+    (p.price != null
+      ? ` · price ${money(p.price)} · day ${dayMove(p)} · value ${money(value(p.sec_type, p.shares, p.price))} · ` +
+        `Total P/L ${signed(value(p.sec_type, p.shares, p.price - p.avgCost))}`
+      : p.priceFailed ? ` · price ${NO_PRICE} · day ${NO_PRICE} · value ${NO_PRICE} · Total P/L ${NO_PRICE}` : ''),
+
+  // A page of a /portfolio holdings tab as a table: holdingLine's fields but average cost and cost
+  // basis (see portfolio.columns), one column each.
+  // Discord has no tables and its text font is not monospaced, so it is a code block, which is.
+  // Each column is as wide as its widest cell on this page (no fixed maximum), two spaces apart,
+  // the first left-aligned and the numbers right-aligned. Code blocks show ** literally, so names
+  // are not bold. Each holding takes two lines, its day under its price and value (see
+  // holdingCells), so no line carries every column (six in a row wrapped in Discord). The dot ends the
+  // second line with no space or heading: an emoji is about two letters wide, so anywhere but the end
+  // of a line it would push what comes after it out of line.
+  holdingsTable: (tab: Holdable, holdings: Holding[]) => {
+    const headings = [...messages.portfolio.columns[tab], ...messages.portfolio.priceColumns];
+    const rows = holdings.map(holdingCells);
+    // Every line in the table, as cells; each column is as wide as its widest cell on any of them.
+    const lines = [headings, ...rows.flatMap((r) => [r.cells, r.under])];
+    const widths = headings.map((_, i) => Math.max(...lines.map((cells) => cells[i].length)));
+    const line = (cells: string[]) =>
+      cells.map((c, i) => (i === 0 ? c.padEnd(widths[i]) : c.padStart(widths[i]))).join('  ').trimEnd();
+    const rule = widths.map((w) => '─'.repeat(w)).join('  ');
+    return [
+      '```',
+      line(headings),
+      rule,
+      ...rows.flatMap((r) => [line(r.cells), line(r.under) + r.dot]),
+      '```',
+    ].join('\n');
+  },
 };

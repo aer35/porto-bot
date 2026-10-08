@@ -39,15 +39,17 @@ export function clearAllState() {
   db.exec('DELETE FROM holdings; DELETE FROM tx_history;');
 }
 
-// A member's positions, optionally of one type: alphabetical by ticker, then by type, and options
-// of one ticker by nearest expiry, then strike, then right.
+// A member's positions, optionally of one type: alphabetical by ticker, a ticker's shares (or coins)
+// before its option contracts, as /position lists them, and those contracts by nearest expiry,
+// then strike, then right. `sec_type = 'OPTION'` is 0 or 1, so it sorts options last; sorting by
+// sec_type itself would put OPTION before STOCK.
 export const holdingsOf = (userId: string, secType?: Holdable) =>
   db
     .prepare(
       `SELECT sec_type, ticker, opt_right, strike, expiry, shares, avg_cost AS avgCost
        FROM holdings
        WHERE user_id = ? AND (? IS NULL OR sec_type = ?)
-       ORDER BY ticker, sec_type, expiry, strike, opt_right`,
+       ORDER BY ticker, sec_type = 'OPTION', expiry, strike, opt_right`,
     )
     .all(userId, secType ?? null, secType ?? null) as Position[];
 

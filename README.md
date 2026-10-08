@@ -134,7 +134,8 @@ docker compose logs porto-bot
 ```
 
 Look for a line starting with `Logged in as`. Your bot should now show as online in your server's member list, with
-the version it runs, like `v2.0.0`, as its status.
+its version and price-feed status as its status, like `v2.5.0 · API: 🟢` (see [Price data](#price-data)). The `API`
+part appears a few seconds after the bot starts.
 
 ---
 
@@ -214,7 +215,7 @@ Wherever this README shows a `docker compose run --rm porto-bot node dist/...` c
 | `/buy option`         | Record option contracts you bought               | `ticker`, `type`, `strike`, `expiry`, `contracts`, `price` | `date` |
 | `/sell option`        | Record option contracts you sold                 | `ticker`, `type`, `strike`, `expiry`, `contracts`, `price` | `date` |
 | `/portfolio`          | Show holdings and transactions, one tab per type | —                           | `user`   |
-| `/position`           | Show every transaction for one ticker            | `ticker`                    | `user`   |
+| `/position`           | Show your holdings and transactions for one ticker, options included | `ticker`                    | `user`   |
 | `/amend`              | Fix a transaction you entered wrong              | `id`                        | —        |
 | `/delete`             | Remove a transaction                             | `id`                        | —        |
 | `/clear`              | Remove all of your transactions for one ticker   | `ticker`                    | —        |
@@ -225,11 +226,11 @@ What the options mean:
 
 | Field    | Meaning                                                                                 |
 |----------|-----------------------------------------------------------------------------------------|
-| `ticker` | Stock symbol, like `AAPL`. For crypto, the coin and currency, like `BTC-USD`            |
+| `ticker` | Symbol as on Yahoo Finance, like `AAPL`, but with a dot for share classes (`BRK.B`). For crypto, the coin and currency, like `BTC-USD`. Prices come from Yahoo, so a ticker it does not know gets no price |
 | `shares` | Number of shares, like `10.555`. Fractional shares are supported, up to 3 decimal places |
 | `amount` | Number of coins, like `0.00034`, up to 6 decimal places                                 |
 | `total`  | Crypto only: what you paid or received in total, in USD, like `100`. `amount:0.00001 total:100` means 0.00001 coins for $100, and the bot works out the price per coin. A sale can be `0` |
-| `type`   | Options only: `Call` or `Put`                                                           |
+| `type`   | Options only: `Call` or `Put`, in any case (`call` works too)                           |
 | `strike` | Options only: the strike price per share, like `150`                                    |
 | `expiry` | Options only: the expiry date as `MM/DD/YY`, or `MM/DD` for this year, like `12/24`. When buying, today or later. `/sell option` suggests the strikes and expiries you hold |
 | `contracts` | Options only: number of contracts, a whole number                                    |
@@ -252,10 +253,27 @@ A few things worth knowing:
   is `SSS01` and `SL01` is `XSS01`.
 - Every sale shows its realized profit or loss (`P/L`), against the average cost at the time of that sale: 🟢 for a gain,
   🔴 for a loss.
+- `/portfolio` only shows the holding's current price and value for that day (or the last trading day). Use `/position` to show average cost, cost basis and `Total P/L`.
+- A holding with no price data shows `-`. This may be because the API is down, not returning properly, or the ticker is not known to Yahoo Finance. The bot does not check the validity of tickers. Ensure you are using the same ticker on Yahoo.
 - Deleting or amending a transaction will **not** change or remove the message already in the channel.
-- The bot never lets you sell more shares than you own, or edit your history into an impossible state.
+- The bot does not let you sell more shares than you own, or edit your history into an impossible state.
 - `/reset` and `/split` are limited to members with the **Manage Server** permission (generally moderators). You can change who may use them in
   **Server Settings → Integrations**.
+
+---
+
+## Price data
+
+Prices come from [Yahoo Finance](https://finance.yahoo.com/), through the public address its own charts use:
+`https://query1.finance.yahoo.com/v8/finance/chart/`. No account or token is needed.
+
+The bot checks prices when it starts, then every 10 minutes during standard trading hours: 9:30am to 4:00pm Eastern
+Time, Monday to Friday.
+
+> porto-bot and its authors are not affiliated with, endorsed by, or supported by Yahoo. This address is not an
+> official Yahoo service, and Yahoo can change, limit or block it at any time. porto-bot and its authors are not
+> responsible for the validity or use of the data it provides, or for it being available. Prices may be delayed or
+> wrong, and nothing the bot shows is financial advice.
 
 ---
 
@@ -308,7 +326,7 @@ docker compose cp porto-bot:/data/porto.db ./porto-backup.db
 docker compose start porto-bot
 ```
 
-The bot also backs up the database by itself whenever an update changes its layout, just before applying the change. These copies sit next to `porto.db` in the volume, named like `porto.db.v2-backup-2026-09-26T13-45-00.db`, and are never deleted automatically. Remove old ones when you no longer need them.
+The bot also backs up the database by itself whenever an update changes its layout, just before applying the change. These copies sit next to `porto.db` in the volume, named like `porto.db.v2026092800-backup-2026-09-26T13-45-00.db`, and are never deleted automatically. Remove old ones when you no longer need them.
 
 To restore that backup:
 
@@ -334,6 +352,7 @@ Start with `docker compose logs porto-bot`, which usually says exactly what is w
 | No commands when you type `/`     | Run Step 4 again, check the server ID in `.env`, then reload Discord                                      |
 | "The application did not respond" | The bot is not running. Check `docker compose ps` and the logs                                            |
 | Commands answered twice           | You have two copies running with the same token. Stop one                                                 |
+| Status shows `API: 🔴`            | The bot cannot get prices from Yahoo Finance. Check the machine can reach `query1.finance.yahoo.com`. Yahoo may also be down or limiting requests; the bot keeps working and tries again by itself |
 
 The bot also writes a line to its log for every transaction, so `docker compose logs porto-bot` is a record of everything that
 has been entered.

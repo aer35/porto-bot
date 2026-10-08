@@ -10,6 +10,12 @@ export function parseTicker(input: string) {
   return /^[A-Z.]{1,6}$/.test(ticker) ? ticker : null;
 }
 
+// An option's type in any case, "call" or " Put ", as stored: CALL or PUT.
+export function parseOptionType(input: string) {
+  const type = input.trim().toUpperCase();
+  return type === 'CALL' || type === 'PUT' ? type : null;
+}
+
 // Yahoo-style crypto pair like BTC-USD: the coin, then the currency it is priced in. A bare
 // symbol like BTC means BTC-USD, so one coin is never stored under two tickers.
 export function parseCryptoTicker(input: string) {
