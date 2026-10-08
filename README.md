@@ -253,12 +253,10 @@ A few things worth knowing:
   is `SSS01` and `SL01` is `XSS01`.
 - Every sale shows its realized profit or loss (`P/L`), against the average cost at the time of that sale: 🟢 for a gain,
   🔴 for a loss.
-- `/portfolio` shows each holding's price and value, with the day's price move and the day's gain or loss (🟢/🔴)
-  under them. `/position` also shows average cost, cost basis and `Total P/L`, the profit or loss since buying.
-- A holding with no price shows `-` (in `/position`, only its cost until the first fetch) and counts at cost in the
-  totals. Option values are for the whole contract, 100 times the quoted price. See [Price data](#price-data).
+- `/portfolio` only shows the holding's current price and value for that day (or the last trading day). Use `/position` to show average cost, cost basis and `Total P/L`.
+- A holding with no price data shows `-`. This may be because the API is down, not returning properly, or the ticker is not known to Yahoo Finance. The bot does not check the validity of tickers. Ensure you are using the same ticker on Yahoo.
 - Deleting or amending a transaction will **not** change or remove the message already in the channel.
-- The bot never lets you sell more shares than you own, or edit your history into an impossible state.
+- The bot does not let you sell more shares than you own, or edit your history into an impossible state.
 - `/reset` and `/split` are limited to members with the **Manage Server** permission (generally moderators). You can change who may use them in
   **Server Settings → Integrations**.
 
